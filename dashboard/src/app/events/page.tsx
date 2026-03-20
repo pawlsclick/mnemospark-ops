@@ -1,9 +1,10 @@
 import { AppShell } from '@/components/dashboard/app-shell'
 import { BreakdownBarChart, TimeSeriesChart } from '@/components/dashboard/charts'
 import { EventTable } from '@/components/dashboard/tables'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getEventsPageData } from '@/lib/data/events'
 import type { DashboardEvent } from '@/lib/types/events'
 
@@ -45,52 +46,27 @@ export default async function EventsPage({
 
   const data = await getEventsPageData()
   const filteredEvents = filterEvents(data.events, params)
-  const routeOptions = Array.from(new Set(data.events.map((event) => event.route).filter(Boolean))) as string[]
-  const lambdaOptions = Array.from(new Set(data.events.map((event) => event.lambdaName).filter(Boolean))) as string[]
-  const statusOptions = Array.from(new Set(data.events.map((event) => event.status).filter(Boolean))) as string[]
 
   return (
     <AppShell title="Events" description="Live and historical stream with route/lambda/wallet tracing context.">
       <div className="space-y-4">
         <Card>
           <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            <Input placeholder="wallet_address" value={params.wallet ?? ''} readOnly />
-            <Input placeholder="quote_id" value={params.quote ?? ''} readOnly />
-            <Input placeholder="request_id" value={params.request ?? ''} readOnly />
-            <Select value={params.route ?? 'all'} disabled={routeOptions.length === 0}>
-              <SelectTrigger><SelectValue placeholder="route" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">all</SelectItem>
-                {routeOptions.map((route) => (
-                  <SelectItem key={route} value={route}>
-                    {route}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={params.lambda ?? 'all'} disabled={lambdaOptions.length === 0}>
-              <SelectTrigger><SelectValue placeholder="lambda" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">all</SelectItem>
-                {lambdaOptions.map((lambdaName) => (
-                  <SelectItem key={lambdaName} value={lambdaName}>
-                    {lambdaName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={params.status ?? 'all'} disabled={statusOptions.length === 0}>
-              <SelectTrigger><SelectValue placeholder="status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">all</SelectItem>
-                {statusOptions.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <CardContent>
+            <form method="GET" className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <Input name="wallet" placeholder="wallet_address" defaultValue={params.wallet ?? ''} />
+              <Input name="quote" placeholder="quote_id" defaultValue={params.quote ?? ''} />
+              <Input name="request" placeholder="request_id" defaultValue={params.request ?? ''} />
+              <Input name="route" placeholder="route" defaultValue={params.route ?? ''} />
+              <Input name="lambda" placeholder="lambda" defaultValue={params.lambda ?? ''} />
+              <Input name="status" placeholder="status (success|error|pending|info)" defaultValue={params.status ?? ''} />
+              <div className="xl:col-span-6 flex gap-2">
+                <Button type="submit" variant="outline">Apply filters</Button>
+                <Link href="/events">
+                  <Button type="button" variant="ghost">Clear</Button>
+                </Link>
+              </div>
+            </form>
           </CardContent>
         </Card>
 
