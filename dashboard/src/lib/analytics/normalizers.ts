@@ -18,9 +18,19 @@ export function normalizeAmount(
   return parsed / decimals
 }
 
-export function coerceIsoDate(value?: string | null): ISODateString | undefined {
-  if (!value) return undefined
-  const date = new Date(value)
+export function coerceIsoDate(value?: string | number | null): ISODateString | undefined {
+  if (value === undefined || value === null) return undefined
+  const asString = String(value).trim()
+  if (!asString) return undefined
+  if (/^\d+$/.test(asString)) {
+    const raw = Number(asString)
+    if (!Number.isFinite(raw)) return undefined
+    const millis = asString.length <= 10 ? raw * 1000 : raw
+    const d = new Date(millis)
+    if (!Number.isFinite(d.getTime())) return undefined
+    return d.toISOString()
+  }
+  const date = new Date(asString)
   if (!Number.isFinite(date.getTime())) return undefined
   return date.toISOString()
 }

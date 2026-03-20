@@ -18,6 +18,10 @@ import {
   toWalletAddress,
 } from '@/lib/analytics/normalizers'
 
+function str(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
 function severityFromStatus(status: EventFacts['normalizedStatus']): DashboardEvent['severity'] {
   if (status === 'failed') return 'high'
   if (status === 'unknown') return 'medium'
@@ -62,12 +66,14 @@ export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFact
     const status = normalizeStatus(row.status, row.reason)
     events.push({
       eventId: `quote:${row.quote_id}:${row.created_at ?? row.event_ts ?? 'na'}`,
-      timestamp: coerceIsoDate(row.created_at ?? row.event_ts) ?? new Date(0).toISOString(),
-      walletAddress: toWalletAddress(row.wallet_address),
+      timestamp:
+        coerceIsoDate(row.created_at ?? row.event_ts ?? str(row.timestamp)) ??
+        new Date().toISOString(),
+      walletAddress: toWalletAddress(row.wallet_address ?? str(row.addr)),
       quoteId: toQuoteId(row.quote_id),
       requestId: toRequestId(row.request_id),
-      network: typeof row.network === 'string' ? row.network : undefined,
-      amountNormalized: normalizeAmount(row.amount),
+      network: str(row.network),
+      amountNormalized: normalizeAmount(row.amount ?? str(row.storage_price)),
       normalizedStatus: status,
       normalizedReason: status === 'failed' ? normalizeFailureCategory(row.reason, row.status) : undefined,
       source: 'quotes',
@@ -83,8 +89,10 @@ export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFact
     const status = normalizeStatus(row.status, row.reason)
     events.push({
       eventId: `upload:${row.quote_id}:${row.trans_id}`,
-      timestamp: coerceIsoDate(row.event_ts ?? row.created_at) ?? new Date(0).toISOString(),
-      walletAddress: toWalletAddress(row.wallet_address),
+      timestamp:
+        coerceIsoDate(row.event_ts ?? row.created_at ?? str(row.timestamp)) ??
+        new Date().toISOString(),
+      walletAddress: toWalletAddress(row.wallet_address ?? str(row.addr)),
       quoteId: toQuoteId(row.quote_id),
       requestId: toRequestId(row.request_id),
       transId: toTransactionId(row.trans_id),
@@ -92,12 +100,12 @@ export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFact
         typeof row.idempotency_key === 'string' && row.idempotency_key.length > 0
           ? row.idempotency_key
           : undefined,
-      network: typeof row.network === 'string' ? row.network : undefined,
-      amountNormalized: normalizeAmount(row.amount),
+      network: str(row.network ?? row.payment_network),
+      amountNormalized: normalizeAmount(row.amount ?? str(row.payment_amount)),
       normalizedStatus: status,
       normalizedReason: status === 'failed' ? normalizeFailureCategory(row.reason, row.status) : undefined,
-      route: typeof row.route === 'string' ? row.route : undefined,
-      lambdaName: typeof row.lambda_name === 'string' ? row.lambda_name : undefined,
+      route: str(row.route ?? row.path),
+      lambdaName: str(row.lambda_name),
       source: 'upload_logs',
       eventType: classifyEventType('upload_logs', status),
       rawStatus: row.status,
@@ -108,15 +116,18 @@ export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFact
   }
 
   for (const row of payments) {
-    const status = normalizeStatus(row.status, row.reason)
+    const status = normalizeStatus(row.status ?? str(row.payment_status), row.reason)
     events.push({
       eventId: `payment:${row.wallet_address}:${row.quote_id}`,
-      timestamp: coerceIsoDate(row.event_ts ?? row.created_at) ?? new Date(0).toISOString(),
+      timestamp:
+        coerceIsoDate(
+          row.event_ts ?? row.created_at ?? str(row.payment_received_at) ?? str(row.timestamp),
+        ) ?? new Date().toISOString(),
       walletAddress: toWalletAddress(row.wallet_address),
       quoteId: toQuoteId(row.quote_id),
       requestId: toRequestId(row.request_id),
-      network: typeof row.network === 'string' ? row.network : undefined,
-      amountNormalized: normalizeAmount(row.amount),
+      network: str(row.network),
+      amountNormalized: normalizeAmount(row.amount ?? str(row.storage_price)),
       normalizedStatus: status,
       normalizedReason: status === 'failed' ? normalizeFailureCategory(row.reason, row.status) : undefined,
       source: 'payments',
@@ -129,10 +140,14 @@ export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFact
   }
 
   for (const row of authEvents) {
-    const status = normalizeStatus(row.status, row.reason)
+    const normalizedFromResult =
+      str(row.result)?.toLowerCase() === 'allow' ? 'wallet_auth_succeeded' : 'wallet_auth_failed'
+    const status = normalizeStatus(normalizedFromResult, row.reason)
     events.push({
       eventId: `auth:${row.event_id}`,
-      timestamp: coerceIsoDate(row.event_ts ?? row.created_at) ?? new Date(0).toISOString(),
+      timestamp:
+        coerceIsoDate(row.event_ts ?? row.created_at ?? str(row.timestamp)) ??
+        new Date().toISOString(),
       walletAddress: toWalletAddress(row.wallet_address),
       requestId: toRequestId(row.request_id),
       normalizedStatus: status,
@@ -147,17 +162,25 @@ export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFact
   }
 
   for (const row of apiCalls) {
+    const apiStatusCode =
+      typeof row.status_code === 'number'
+        ? row.status_code
+        : typeof row.status_code === 'string'
+          ? Number(row.status_code)
+          : undefined
     const status =
-      row.status_code && row.status_code >= 400
+      apiStatusCode && apiStatusCode >= 400
         ? 'failed'
         : normalizeStatus(row.status, row.reason ?? row.error)
     events.push({
       eventId: `api:${row.request_id}`,
-      timestamp: coerceIsoDate(row.event_ts ?? row.created_at) ?? new Date(0).toISOString(),
+      timestamp:
+        coerceIsoDate(row.event_ts ?? row.created_at ?? str(row.timestamp)) ??
+        new Date().toISOString(),
       walletAddress: toWalletAddress(row.wallet_address),
       quoteId: toQuoteId(row.quote_id),
       requestId: toRequestId(row.request_id),
-      route: typeof row.route === 'string' ? row.route : undefined,
+      route: str(row.route ?? row.path),
       lambdaName: typeof row.lambda_name === 'string' ? row.lambda_name : undefined,
       normalizedStatus: status,
       normalizedReason:

@@ -15,6 +15,7 @@ import {
   getRecentCriticalFailures,
   getRetryCountsPerQuote,
   getRootCausePanel,
+  getWalletTrace,
 } from '@/lib/analytics/queries'
 import type { QuoteId, RequestId, TimeRangeInput, WalletAddress } from '@/lib/types/api'
 import type { DashboardEvent } from '@/lib/types/events'
@@ -102,7 +103,11 @@ export async function getTracePanelData(input: {
   walletAddress?: WalletAddress
 }): Promise<{
   rootCause: Awaited<ReturnType<typeof getRootCausePanel>>
+  walletTrace: DashboardEvent[]
 }> {
+  const walletTrace = input.walletAddress
+    ? await getWalletTrace(input.walletAddress)
+    : []
   const rootCause = await getRootCausePanel({ quoteId: input.quoteId, requestId: input.requestId })
-  return { rootCause }
+  return { rootCause, walletTrace }
 }

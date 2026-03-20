@@ -4,6 +4,7 @@ import { buildWalletFacts } from '@/lib/analytics/wallet-facts'
 import { fetchAppSyncLiveEvents } from '@/lib/aws/appsync'
 import { EMPTY_LAMBDA_SUMMARIES, KNOWN_LAMBDA_LOGICAL_NAMES, KNOWN_ROUTES } from '@/lib/constants'
 import type {
+  ISODateString,
   ObjectId,
   ObjectIdHash,
   QuoteId,
@@ -74,6 +75,10 @@ function quoteFactsInRange(facts: QuoteFacts[], input?: TimeRangeInput): QuoteFa
     if (input.to && ts > input.to) return false
     return true
   })
+}
+
+function normalizeWalletAddress(walletAddress: string): string {
+  return walletAddress.trim().toLowerCase()
 }
 
 export async function getRevenueDaily(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
@@ -210,9 +215,15 @@ export async function getWalletDetail(walletAddress: WalletAddress, input?: Time
     buildDashboardEvents(input),
   ])
 
-  const wallet = wallets.find((entry) => entry.walletAddress === walletAddress) ?? null
-  const walletQuotes = quotes.filter((entry) => entry.walletAddress === walletAddress)
-  const walletEvents = events.filter((entry) => entry.walletAddress === walletAddress)
+  const normalizedInput = normalizeWalletAddress(walletAddress)
+  const wallet =
+    wallets.find((entry) => normalizeWalletAddress(entry.walletAddress) === normalizedInput) ?? null
+  const walletQuotes = quotes.filter(
+    (entry) => entry.walletAddress && normalizeWalletAddress(entry.walletAddress) === normalizedInput,
+  )
+  const walletEvents = events.filter(
+    (entry) => entry.walletAddress && normalizeWalletAddress(entry.walletAddress) === normalizedInput,
+  )
 
   return { wallet, quotes: walletQuotes, events: walletEvents }
 }
@@ -476,8 +487,11 @@ export async function getRequestTrace(requestId: RequestId): Promise<DashboardEv
 
 export async function getWalletTrace(walletAddress: WalletAddress, input?: TimeRangeInput): Promise<DashboardEvent[]> {
   const events = await buildDashboardEvents(input)
+  const normalizedInput = normalizeWalletAddress(walletAddress)
   return events
-    .filter((event) => event.walletAddress === walletAddress)
+    .filter(
+      (event) => event.walletAddress && normalizeWalletAddress(event.walletAddress) === normalizedInput,
+    )
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
 }
 
@@ -685,4 +699,45 @@ export async function getDashboardEvents(input?: TimeRangeInput): Promise<Dashbo
 
 export async function getEventFacts(input?: TimeRangeInput) {
   return buildEventFacts(input)
+}
+
+export async function getFilteredEvents(input?: {
+  from?: ISODateString
+  to?: ISODateString
+  wallet?: string
+  quoteId?: string
+  requestId?: string
+  route?: string
+  lambda?: string
+  status?: 'success' | 'error' | 'pending' | 'info' | 'all'
+}): Promise<DashboardEvent[]> {
+  const events = await buildDashboardEvents({ from: input?.from, to: input?.to })
+  const walletFilter = input?.wallet?.trim().toLowerCase()
+  const quoteFilter = input?.quoteId?.trim()
+  const requestFilter = input?.requestId?.trim()
+  const routeFilter = input?.route?.trim()
+  const lambdaFilter = input?.lambda?.trim()
+  const statusFilter = input?.status && input.status !== 'all' ? input.status : undefined
+
+  return events.filter((event) => {
+    if (walletFilter && (!event.walletAddress || !event.walletAddress.toLowerCase().includes(walletFilter))) {
+      return false
+    }
+    if (quoteFilter && (!event.quoteId || !event.quoteId.includes(quoteFilter))) {
+      return false
+    }
+    if (requestFilter && (!event.requestId || !event.requestId.includes(requestFilter))) {
+      return false
+    }
+    if (routeFilter && event.route !== routeFilter) {
+      return false
+    }
+    if (lambdaFilter && event.lambdaName !== lambdaFilter) {
+      return false
+    }
+    if (statusFilter && event.status !== statusFilter) {
+      return false
+    }
+    return true
+  })
 }

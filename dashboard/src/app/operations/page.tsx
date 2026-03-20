@@ -1,17 +1,27 @@
 import { AppShell } from '@/components/dashboard/app-shell'
 import { BreakdownBarChart, TimeSeriesChart } from '@/components/dashboard/charts'
 import { EventTable } from '@/components/dashboard/tables'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { getOperationsPageData } from '@/lib/data/operations'
+import { getOperationsPageData, getTracePanelData } from '@/lib/data/operations'
 
 function pct(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
-export default async function OperationsPage() {
+export default async function OperationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ quote_id?: string; request_id?: string }>
+}) {
+  const resolvedParams = await searchParams
   const data = await getOperationsPageData()
+  const trace = await getTracePanelData({
+    quoteId: resolvedParams.quote_id,
+    requestId: resolvedParams.request_id,
+  })
 
   return (
     <AppShell title="Operations" description="Health, failures, lambda noise, and traces.">
@@ -73,11 +83,28 @@ export default async function OperationsPage() {
         <TabsContent value="trace" className="space-y-4">
           <Card>
             <CardHeader><CardTitle>Trace lookup</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <Input placeholder="quote_id" disabled />
-              <Input placeholder="request_id" disabled />
-              <Input placeholder="wallet_address" disabled />
-              <p className="text-xs text-muted-foreground md:col-span-3">Lookup fields are wired to query functions in data layer; interactive submit is intentionally deferred for MVP simplicity.</p>
+            <CardContent>
+              <form method="GET" className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <Input name="quote_id" placeholder="quote_id" defaultValue={resolvedParams.quote_id ?? ''} />
+                <Input name="request_id" placeholder="request_id" defaultValue={resolvedParams.request_id ?? ''} />
+                <Button type="submit" variant="outline">Lookup trace</Button>
+              </form>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Root-cause panel</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p>latest event: {trace.rootCause.latestEvent?.eventType ?? '—'}</p>
+              <p>first failure: {trace.rootCause.firstFailureEvent?.eventType ?? '—'}</p>
+              <p>likely failure category: {trace.rootCause.likelyFailureCategory ?? '—'}</p>
+              <p>likely failed stage: {trace.rootCause.likelyFailedStage ?? '—'}</p>
+              <p>related events: {trace.rootCause.relatedEvents.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Trace events</CardTitle></CardHeader>
+            <CardContent className="max-h-[420px] overflow-auto">
+              <EventTable rows={trace.rootCause.relatedEvents} />
             </CardContent>
           </Card>
           <Card>
