@@ -11,9 +11,18 @@ import { pct } from '@/lib/format'
 export default async function OperationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ quote_id?: string; request_id?: string }>
+  searchParams: Promise<{ quote_id?: string; request_id?: string; tab?: string }>
 }) {
   const resolvedParams = await searchParams
+  const defaultTab =
+    resolvedParams.tab === 'health' ||
+    resolvedParams.tab === 'failures' ||
+    resolvedParams.tab === 'lambdas' ||
+    resolvedParams.tab === 'trace'
+      ? resolvedParams.tab
+      : resolvedParams.quote_id || resolvedParams.request_id
+        ? 'trace'
+        : 'health'
   const data = await getOperationsPageData()
   const trace = await getTracePanelData({
     quoteId: resolvedParams.quote_id,
@@ -22,7 +31,7 @@ export default async function OperationsPage({
 
   return (
     <AppShell title="Operations" description="Health, failures, lambda noise, and traces.">
-      <Tabs defaultValue="health" className="space-y-4">
+      <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="health">Health</TabsTrigger>
           <TabsTrigger value="failures">Failures</TabsTrigger>
@@ -82,6 +91,7 @@ export default async function OperationsPage({
             <CardHeader><CardTitle>Trace lookup</CardTitle></CardHeader>
             <CardContent>
               <form method="GET" className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <input type="hidden" name="tab" value="trace" />
                 <Input name="quote_id" placeholder="quote_id" defaultValue={resolvedParams.quote_id ?? ''} />
                 <Input name="request_id" placeholder="request_id" defaultValue={resolvedParams.request_id ?? ''} />
                 <Button type="submit" variant="outline">Lookup trace</Button>
