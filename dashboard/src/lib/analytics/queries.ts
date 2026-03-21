@@ -1,6 +1,6 @@
-import { buildDashboardEvents, getCachedEventFacts } from '@/lib/analytics/event-facts'
-import { getCachedQuoteFacts } from '@/lib/analytics/quote-facts'
-import { getCachedWalletFacts } from '@/lib/analytics/wallet-facts'
+import { buildDashboardEvents, buildEventFacts } from '@/lib/analytics/event-facts'
+import { buildQuoteFacts } from '@/lib/analytics/quote-facts'
+import { buildWalletFacts } from '@/lib/analytics/wallet-facts'
 import { fetchAppSyncLiveEvents } from '@/lib/aws/appsync'
 import { EMPTY_LAMBDA_SUMMARIES, KNOWN_LAMBDA_LOGICAL_NAMES, KNOWN_ROUTES } from '@/lib/constants'
 import type {
@@ -10,7 +10,7 @@ import type {
   TimeRangeInput,
   WalletAddress,
 } from '@/lib/types/api'
-import type { DashboardEvent, FailureCategory } from '@/lib/types/events'
+import type { DashboardEvent, EventFacts, FailureCategory } from '@/lib/types/events'
 import type {
   FunnelMetrics,
   HealthScore,
@@ -32,31 +32,31 @@ const cache = {
 }
 
 async function getCachedEventFacts(input?: TimeRangeInput): Promise<EventFacts[]> {
-  if (input) return getCachedEventFacts(input) // Don't cache filtered requests
+  if (input) return buildEventFacts(input) // Don't cache filtered requests
   if (cache.eventFacts.data && Date.now() - cache.eventFacts.timestamp < CACHE_TTL_MS) {
     return cache.eventFacts.data
   }
-  const data = await getCachedEventFacts()
+  const data = await buildEventFacts()
   cache.eventFacts = { data, timestamp: Date.now() }
   return data
 }
 
 async function getCachedQuoteFacts(input?: TimeRangeInput): Promise<QuoteFacts[]> {
-  if (input) return getCachedQuoteFacts(input) // Don't cache filtered requests
+  if (input) return buildQuoteFacts(input) // Don't cache filtered requests
   if (cache.quoteFacts.data && Date.now() - cache.quoteFacts.timestamp < CACHE_TTL_MS) {
     return cache.quoteFacts.data
   }
-  const data = await getCachedQuoteFacts()
+  const data = await buildQuoteFacts()
   cache.quoteFacts = { data, timestamp: Date.now() }
   return data
 }
 
 async function getCachedWalletFacts(input?: TimeRangeInput): Promise<WalletFacts[]> {
-  if (input) return getCachedWalletFacts(input) // Don't cache filtered requests
+  if (input) return buildWalletFacts(input) // Don't cache filtered requests
   if (cache.walletFacts.data && Date.now() - cache.walletFacts.timestamp < CACHE_TTL_MS) {
     return cache.walletFacts.data
   }
-  const data = await getCachedWalletFacts()
+  const data = await buildWalletFacts()
   cache.walletFacts = { data, timestamp: Date.now() }
   return data
 }
