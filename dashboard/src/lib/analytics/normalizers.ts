@@ -22,10 +22,11 @@ export function coerceIsoDate(value?: string | number | null): ISODateString | u
   if (value === undefined || value === null) return undefined
   const asString = String(value).trim()
   if (!asString) return undefined
-  if (/^\d+$/.test(asString)) {
+  if (/^\d+(\.\d+)?$/.test(asString)) {
     const raw = Number(asString)
     if (!Number.isFinite(raw)) return undefined
-    const millis = asString.length <= 10 ? raw * 1000 : raw
+    const wholePart = asString.split('.')[0]
+    const millis = wholePart.length <= 10 ? raw * 1000 : raw
     const d = new Date(millis)
     if (!Number.isFinite(d.getTime())) return undefined
     return d.toISOString()
