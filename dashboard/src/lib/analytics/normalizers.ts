@@ -48,19 +48,19 @@ export function normalizeStatus(rawStatus?: string, rawReason?: string | null): 
   }
 
   if (
-    status.includes('transaction_log_written') ||
-    status.includes('upload_started') ||
-    status.includes('upload_initiated')
-  ) {
-    return 'upload_started'
-  }
-
-  if (
     status.includes('confirm_transaction_log_written') ||
     status.includes('upload_confirmed') ||
     status.includes('confirm')
   ) {
     return 'upload_confirmed'
+  }
+
+  if (
+    status.includes('transaction_log_written') ||
+    status.includes('upload_started') ||
+    status.includes('upload_initiated')
+  ) {
+    return 'upload_started'
   }
 
   const combined = `${status} ${reason}`

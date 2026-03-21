@@ -18,6 +18,12 @@ import {
   toWalletAddress,
 } from '@/lib/analytics/normalizers'
 
+function timeRangeKey(input?: TimeRangeInput): string {
+  return `${input?.from ?? ''}|${input?.to ?? ''}`
+}
+
+const eventFactsInFlight = new Map<string, Promise<EventFacts[]>>()
+
 function str(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
@@ -51,7 +57,7 @@ function classifyEventType(source: string, normalizedStatus: EventFacts['normali
   return 'lambda_invoked'
 }
 
-export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFacts[]> {
+async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFacts[]> {
   const [quotes, uploads, payments, authEvents, apiCalls] = await Promise.all([
     fetchQuotes(input),
     fetchUploadTransactionLogs(input),
@@ -198,6 +204,20 @@ export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFact
   return events
 }
 
+export async function buildEventFacts(input?: TimeRangeInput): Promise<EventFacts[]> {
+  const key = timeRangeKey(input)
+  const existing = eventFactsInFlight.get(key)
+  if (existing) return existing
+
+  const inFlight = buildEventFactsUncached(input)
+  eventFactsInFlight.set(key, inFlight)
+  try {
+    return await inFlight
+  } finally {
+    eventFactsInFlight.delete(key)
+  }
+}
+
 export async function buildDashboardEvents(input?: TimeRangeInput): Promise<DashboardEvent[]> {
   const facts = await buildEventFacts(input)
   return facts.map((fact) => ({
@@ -208,8 +228,14 @@ export async function buildDashboardEvents(input?: TimeRangeInput): Promise<Dash
     source: fact.source,
     route: fact.route,
     lambdaName: fact.lambdaName,
-    status: uiStatus(fact.normalizedStatus),
-    severity: severityFromStatus(fact.normalizedStatus),
+    status:
+      fact.source === 'wallet_auth' && fact.eventType === 'wallet_auth_succeeded'
+        ? 'success'
+        : uiStatus(fact.normalizedStatus),
+    severity:
+      fact.source === 'wallet_auth' && fact.eventType === 'wallet_auth_succeeded'
+        ? 'info'
+        : severityFromStatus(fact.normalizedStatus),
     normalizedStatus: fact.normalizedStatus,
     normalizedReason: fact.normalizedReason,
     quoteId: fact.quoteId,
