@@ -100,6 +100,8 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
 
   for (const row of uploads) {
     const status = row.payment_status === 'confirmed' ? 'upload_confirmed' : normalizeStatus(row.status, row.reason)
+    const route = str(row.route ?? row.path)
+    const lambdaName = str(row.lambda_name) ?? (route === '/storage/upload' ? 'StorageUploadFunction' : route === '/storage/upload/confirm' ? 'StorageUploadConfirmFunction' : undefined)
     events.push({
       eventId: `upload:${row.quote_id}:${row.trans_id}`,
       timestamp:
@@ -117,8 +119,8 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
       amountNormalized: normalizeAmount(row.amount ?? strOrNumber(row.payment_amount)),
       normalizedStatus: status,
       normalizedReason: status === 'failed' ? normalizeFailureCategory(row.reason, row.status) : undefined,
-      route: str(row.route ?? row.path),
-      lambdaName: str(row.lambda_name),
+      route,
+      lambdaName,
       source: 'upload_logs',
       eventType: classifyEventType('upload_logs', status),
       rawStatus: row.status,
@@ -182,6 +184,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
           ? Number(row.status_code)
           : undefined
     const route = str(row.route ?? row.path)
+    const isApiFailure = apiStatusCode ? apiStatusCode >= 400 : false
     const status =
       route === '/price-storage'
         ? 'quote_created'
@@ -189,7 +192,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
           ? 'upload_started'
         : route === '/storage/upload/confirm'
           ? 'upload_confirmed'
-          : apiStatusCode && apiStatusCode >= 400
+          : isApiFailure
             ? 'failed'
             : normalizeStatus(row.status, row.reason ?? row.error)
     events.push({
@@ -209,7 +212,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
       eventType: classifyEventType('api_calls', status, route),
       rawStatus: row.status,
       rawReason: row.error ?? row.reason,
-      isFailure: status === 'failed',
+      isFailure: isApiFailure,
       metadata: row,
     })
   }

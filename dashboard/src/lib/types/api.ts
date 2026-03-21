@@ -11,6 +11,7 @@ export type ISODateString = string
 export interface TimeRangeInput {
   from?: ISODateString
   to?: ISODateString
+  route?: string
 }
 
 export interface UploadTransactionLogRow {
