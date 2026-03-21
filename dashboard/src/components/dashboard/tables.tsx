@@ -12,33 +12,11 @@ import type { DashboardEvent } from '@/lib/types/events'
 import type { QuoteFacts } from '@/lib/types/transaction'
 import type { WalletFacts } from '@/lib/types/wallet'
 
+import { DataTable } from './data-table'
+import { columns as walletColumns } from './wallet-columns'
+
 export function WalletTable({ wallets }: { wallets: WalletFacts[] }) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Wallet</TableHead>
-          <TableHead>Revenue</TableHead>
-          <TableHead>Quotes</TableHead>
-          <TableHead>Uploads</TableHead>
-          <TableHead>Failures</TableHead>
-          <TableHead>Last seen</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {wallets.map((wallet) => (
-          <TableRow key={wallet.walletAddress}>
-            <TableCell className="font-mono text-xs">{wallet.walletAddress}</TableCell>
-            <TableCell>{money(wallet.totalRevenue)}</TableCell>
-            <TableCell>{wallet.totalQuotes}</TableCell>
-            <TableCell>{wallet.totalUploadsConfirmed}</TableCell>
-            <TableCell>{wallet.totalFailures}</TableCell>
-            <TableCell>{wallet.lastSeenAt?.slice(0, 19) ?? '—'}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  )
+  return <DataTable columns={walletColumns} data={wallets} />
 }
 
 export function TransactionTable({ rows }: { rows: QuoteFacts[] }) {
