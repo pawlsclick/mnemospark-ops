@@ -54,6 +54,7 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
       idempotencyKeys: [],
       objectId: typeof call.object_id === 'string' ? call.object_id : undefined,
       objectIdHash: typeof call.object_id_hash === 'string' ? call.object_id_hash : undefined,
+      objectKey: typeof call.object_key === 'string' ? call.object_key : undefined,
     })
   }
 
@@ -102,6 +103,15 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
     }
     if (!existing.network && event.network) {
       existing.network = event.network
+    }
+    if (!existing.objectIdHash && typeof event.metadata?.object_id_hash === 'string') {
+      existing.objectIdHash = event.metadata.object_id_hash
+    }
+    if (!existing.objectId && typeof event.metadata?.object_id === 'string') {
+      existing.objectId = event.metadata.object_id
+    }
+    if (!existing.objectKey && typeof event.metadata?.object_key === 'string') {
+      existing.objectKey = event.metadata.object_key
     }
 
     switch (event.normalizedStatus) {

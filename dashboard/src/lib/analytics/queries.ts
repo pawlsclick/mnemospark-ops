@@ -25,40 +25,90 @@ import type { WalletDetail, WalletFacts } from '@/lib/types/wallet'
 
 // Simple in-memory cache for derived facts
 const CACHE_TTL_MS = 30 * 1000 // 30 seconds
+type CacheEntry<T> = { data: T; timestamp: number }
 const cache = {
-  eventFacts: { data: null as EventFacts[] | null, timestamp: 0 },
-  quoteFacts: { data: null as QuoteFacts[] | null, timestamp: 0 },
-  walletFacts: { data: null as WalletFacts[] | null, timestamp: 0 },
+  eventFacts: new Map<string, CacheEntry<EventFacts[]>>(),
+  quoteFacts: new Map<string, CacheEntry<QuoteFacts[]>>(),
+  walletFacts: new Map<string, CacheEntry<WalletFacts[]>>(),
+}
+const inFlight = {
+  eventFacts: new Map<string, Promise<EventFacts[]>>(),
+  quoteFacts: new Map<string, Promise<QuoteFacts[]>>(),
+  walletFacts: new Map<string, Promise<WalletFacts[]>>(),
+}
+
+function timeRangeKey(input?: TimeRangeInput): string {
+  return `${input?.from ?? ''}|${input?.to ?? ''}|${input?.route ?? ''}`
+}
+
+function isFresh(timestamp: number): boolean {
+  return Date.now() - timestamp < CACHE_TTL_MS
 }
 
 async function getCachedEventFacts(input?: TimeRangeInput): Promise<EventFacts[]> {
-  if (input) return buildEventFacts(input) // Don't cache filtered requests
-  if (cache.eventFacts.data && Date.now() - cache.eventFacts.timestamp < CACHE_TTL_MS) {
-    return cache.eventFacts.data
+  const key = timeRangeKey(input)
+  const cached = cache.eventFacts.get(key)
+  if (cached && isFresh(cached.timestamp)) {
+    return cached.data
   }
-  const data = await buildEventFacts()
-  cache.eventFacts = { data, timestamp: Date.now() }
-  return data
+
+  const pending = inFlight.eventFacts.get(key)
+  if (pending) return pending
+
+  const request = buildEventFacts(input)
+    .then((data) => {
+      cache.eventFacts.set(key, { data, timestamp: Date.now() })
+      return data
+    })
+    .finally(() => {
+      inFlight.eventFacts.delete(key)
+    })
+  inFlight.eventFacts.set(key, request)
+  return request
 }
 
 async function getCachedQuoteFacts(input?: TimeRangeInput): Promise<QuoteFacts[]> {
-  if (input) return buildQuoteFacts(input) // Don't cache filtered requests
-  if (cache.quoteFacts.data && Date.now() - cache.quoteFacts.timestamp < CACHE_TTL_MS) {
-    return cache.quoteFacts.data
+  const key = timeRangeKey(input)
+  const cached = cache.quoteFacts.get(key)
+  if (cached && isFresh(cached.timestamp)) {
+    return cached.data
   }
-  const data = await buildQuoteFacts()
-  cache.quoteFacts = { data, timestamp: Date.now() }
-  return data
+
+  const pending = inFlight.quoteFacts.get(key)
+  if (pending) return pending
+
+  const request = buildQuoteFacts(input)
+    .then((data) => {
+      cache.quoteFacts.set(key, { data, timestamp: Date.now() })
+      return data
+    })
+    .finally(() => {
+      inFlight.quoteFacts.delete(key)
+    })
+  inFlight.quoteFacts.set(key, request)
+  return request
 }
 
 async function getCachedWalletFacts(input?: TimeRangeInput): Promise<WalletFacts[]> {
-  if (input) return buildWalletFacts(input) // Don't cache filtered requests
-  if (cache.walletFacts.data && Date.now() - cache.walletFacts.timestamp < CACHE_TTL_MS) {
-    return cache.walletFacts.data
+  const key = timeRangeKey(input)
+  const cached = cache.walletFacts.get(key)
+  if (cached && isFresh(cached.timestamp)) {
+    return cached.data
   }
-  const data = await buildWalletFacts()
-  cache.walletFacts = { data, timestamp: Date.now() }
-  return data
+
+  const pending = inFlight.walletFacts.get(key)
+  if (pending) return pending
+
+  const request = buildWalletFacts(input)
+    .then((data) => {
+      cache.walletFacts.set(key, { data, timestamp: Date.now() })
+      return data
+    })
+    .finally(() => {
+      inFlight.walletFacts.delete(key)
+    })
+  inFlight.walletFacts.set(key, request)
+  return request
 }
 
 
