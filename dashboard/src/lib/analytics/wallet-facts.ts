@@ -23,6 +23,10 @@ function maxIso(a?: string, b?: string): string | undefined {
   return a > b ? a : b
 }
 
+function normalizeWalletAddress(walletAddress: string): string {
+  return walletAddress.trim().toLowerCase()
+}
+
 export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFacts[]> {
   const [quotes, events] = await Promise.all([buildQuoteFacts(input), buildDashboardEvents(input)])
   const grouped = new Map<string, WalletFacts>()
@@ -30,8 +34,10 @@ export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFa
 
   for (const quote of quotes) {
     if (!quote.walletAddress) continue
-    const existing = grouped.get(quote.walletAddress) ?? {
-      walletAddress: quote.walletAddress,
+    const normalizedWalletAddress = normalizeWalletAddress(quote.walletAddress)
+    if (!normalizedWalletAddress) continue
+    const existing = grouped.get(normalizedWalletAddress) ?? {
+      walletAddress: quote.walletAddress.trim(),
       firstSeenAt: quote.firstSeenAt,
       lastSeenAt: quote.lastSeenAt,
       totalQuotes: 0,
@@ -59,26 +65,28 @@ export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFa
     existing.lastEventType = quote.finalStatus
 
     if (quote.hasPaymentSettled && quote.amountNormalized) {
-      const rows = revenueByWallet.get(quote.walletAddress) ?? []
+      const rows = revenueByWallet.get(normalizedWalletAddress) ?? []
       rows.push(quote.amountNormalized)
-      revenueByWallet.set(quote.walletAddress, rows)
+      revenueByWallet.set(normalizedWalletAddress, rows)
     }
 
-    grouped.set(quote.walletAddress, existing)
+    grouped.set(normalizedWalletAddress, existing)
   }
 
   for (const event of events) {
     if (!event.walletAddress) continue
+    const normalizedWalletAddress = normalizeWalletAddress(event.walletAddress)
+    if (!normalizedWalletAddress) continue
     if (event.eventType === 'wallet_auth_failed') {
-      const existing = grouped.get(event.walletAddress)
+      const existing = grouped.get(normalizedWalletAddress)
       if (existing) {
         existing.totalAuthFailures += 1
         existing.lastSeenAt = maxIso(existing.lastSeenAt, event.timestamp)
         if (event.network) existing.lastNetwork = event.network
         existing.lastEventType = event.eventType
       } else {
-        grouped.set(event.walletAddress, {
-          walletAddress: event.walletAddress,
+        grouped.set(normalizedWalletAddress, {
+          walletAddress: event.walletAddress.trim(),
           firstSeenAt: event.timestamp,
           lastSeenAt: event.timestamp,
           totalQuotes: 0,
@@ -100,7 +108,7 @@ export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFa
   const wallets = Array.from(grouped.values())
   for (const wallet of wallets) {
     wallet.averageRevenuePerQuote = wallet.totalRevenue / (wallet.totalQuotes || 1)
-    wallet.medianTransactionSize = median(revenueByWallet.get(wallet.walletAddress) ?? [])
+    wallet.medianTransactionSize = median(revenueByWallet.get(normalizeWalletAddress(wallet.walletAddress)) ?? [])
   }
 
   return wallets.sort((a, b) => b.totalRevenue - a.totalRevenue)
