@@ -79,6 +79,19 @@ function normalizeWalletAddress(walletAddress: string): string {
   return walletAddress.trim().toLowerCase()
 }
 
+export async function getActiveWallets(input?: { hours?: number }): Promise<number> {
+  const hours = input?.hours ?? 24
+  const from = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+  const events = await buildEventFacts({ from })
+  const uniqueWallets = new Set<string>()
+  for (const event of events) {
+    if (event.walletAddress) {
+      uniqueWallets.add(event.walletAddress)
+    }
+  }
+  return uniqueWallets.size
+}
+
 export async function getRevenueDaily(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
   const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
   const bucket = new Map<string, number>()

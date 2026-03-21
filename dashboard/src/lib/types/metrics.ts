@@ -64,4 +64,5 @@ export interface OverviewData {
   topWallets: WalletFacts[]
   health: HealthScore
   liveEvents: DashboardEvent[]
+  activeWallets: number
 }
