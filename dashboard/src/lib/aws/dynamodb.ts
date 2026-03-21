@@ -59,7 +59,8 @@ async function scanAllRows<T>(
   const expressionAttributeNames: Record<string, string> = {}
 
   if (input?.route) {
-    filterExpressions.push('#path = :route')
+    filterExpressions.push('(#route = :route OR #path = :route)')
+    expressionAttributeNames['#route'] = 'route'
     expressionAttributeNames['#path'] = 'path'
     expressionAttributeValues[':route'] = input.route
   }

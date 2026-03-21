@@ -1,5 +1,5 @@
 import { buildEventFacts } from '@/lib/analytics/event-facts'
-import { normalizeFailureCategory } from '@/lib/analytics/normalizers'
+import { coerceIsoDate, normalizeFailureCategory } from '@/lib/analytics/normalizers'
 import type { TimeRangeInput } from '@/lib/types/api'
 import type { QuoteFacts } from '@/lib/types/transaction'
 import { fetchApiCallRows } from '../aws/dynamodb'
@@ -28,14 +28,22 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
   // 2. Seed the map with every quote ever created from the API calls table
   for (const call of priceStorageCalls) {
     if (!call.quote_id) continue
+    const callTimestamp =
+      coerceIsoDate(
+        call.event_ts ??
+          call.created_at ??
+          (typeof call.timestamp === 'string' || typeof call.timestamp === 'number'
+            ? call.timestamp
+            : undefined),
+      ) ?? new Date().toISOString()
 
     grouped.set(call.quote_id, {
       quoteId: call.quote_id,
       walletAddress: call.wallet_address,
       hasQuoteCreated: true,
-      quoteCreatedAt: call.timestamp,
-      firstSeenAt: call.timestamp,
-      lastSeenAt: call.timestamp,
+      quoteCreatedAt: callTimestamp,
+      firstSeenAt: callTimestamp,
+      lastSeenAt: callTimestamp,
       hasPaymentSettled: false,
       hasUploadStarted: false,
       hasUploadConfirmed: false,
@@ -44,8 +52,8 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
       requestIds: [call.request_id],
       transIds: [],
       idempotencyKeys: [],
-      objectId: call.object_id,
-      objectIdHash: call.object_id_hash,
+      objectId: typeof call.object_id === 'string' ? call.object_id : undefined,
+      objectIdHash: typeof call.object_id_hash === 'string' ? call.object_id_hash : undefined,
     })
   }
 
