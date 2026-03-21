@@ -6,10 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getOperationsPageData, getTracePanelData } from '@/lib/data/operations'
-
-function pct(value: number): string {
-  return `${value.toFixed(1)}%`
-}
+import { pct } from '@/lib/format'
 
 export default async function OperationsPage({
   searchParams,

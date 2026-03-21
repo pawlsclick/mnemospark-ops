@@ -60,9 +60,7 @@ export interface LambdaSummary {
 export interface OverviewData {
   revenue: RevenueMetrics
   funnel: FunnelMetrics
-  failures: SeriesBreakdownPoint[]
   revenueSeries: TimeSeriesPoint[]
-  walletSeries: TimeSeriesPoint[]
   topWallets: WalletFacts[]
   health: HealthScore
   liveEvents: DashboardEvent[]
