@@ -59,9 +59,29 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
 
   // 3. Iterate through all other events to enrich the quote facts
   for (const event of events) {
-    if (!event.quoteId || !grouped.has(event.quoteId)) continue
+    if (!event.quoteId) continue
 
-    const existing = grouped.get(event.quoteId)!
+    let existing = grouped.get(event.quoteId)
+    if (!existing) {
+      existing = {
+        quoteId: event.quoteId,
+        walletAddress: event.walletAddress,
+        network: event.network,
+        amountNormalized: event.amountNormalized,
+        hasQuoteCreated: false,
+        hasPaymentSettled: false,
+        hasUploadStarted: false,
+        hasUploadConfirmed: false,
+        hasFailure: false,
+        finalStatus: 'unknown',
+        requestIds: event.requestId ? [event.requestId] : [],
+        transIds: event.transId ? [event.transId] : [],
+        idempotencyKeys: event.idempotencyKey ? [event.idempotencyKey] : [],
+        firstSeenAt: event.timestamp,
+        lastSeenAt: event.timestamp,
+      }
+      grouped.set(event.quoteId, existing)
+    }
 
     existing.lastSeenAt = maxIso(existing.lastSeenAt, event.timestamp)
     if (event.requestId && !existing.requestIds.includes(event.requestId)) {
@@ -74,6 +94,9 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
       existing.idempotencyKeys.push(event.idempotencyKey)
     }
 
+    if (!existing.walletAddress && event.walletAddress) {
+      existing.walletAddress = event.walletAddress
+    }
     if (!existing.amountNormalized && event.amountNormalized) {
       existing.amountNormalized = event.amountNormalized
     }
@@ -82,6 +105,10 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
     }
 
     switch (event.normalizedStatus) {
+      case 'quote_created':
+        existing.hasQuoteCreated = true
+        existing.quoteCreatedAt = minIso(existing.quoteCreatedAt, event.timestamp)
+        break
       case 'payment_settled':
         existing.hasPaymentSettled = true
         existing.paymentSettledAt = minIso(existing.paymentSettledAt, event.timestamp)
