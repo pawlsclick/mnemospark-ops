@@ -29,7 +29,7 @@ function getComparableTimestamp(item: Record<string, unknown>): string | undefin
   ]
 
   for (const candidate of candidates) {
-    if (typeof candidate !== 'string') continue
+    if (typeof candidate !== 'string' && typeof candidate !== 'number') continue
     const iso = coerceIsoDate(candidate)
     if (iso) return iso
   }
