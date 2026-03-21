@@ -5,15 +5,12 @@ import {
   getFailureRateByStage,
   getFailureReasonBreakdown,
   getFailuresByNetwork,
-  getFailuresByWallet,
   getFailuresOverTime,
   getHealthScore,
   getIdempotencyConflicts,
   getLambdaErrorSummary,
-  getLambdaSummary,
   getQuoteLatencyPercentiles,
   getRecentCriticalFailures,
-  getRetryCountsPerQuote,
   getRootCausePanel,
   getWalletTrace,
 } from '@/lib/analytics/queries'
@@ -21,7 +18,6 @@ import type { QuoteId, RequestId, TimeRangeInput, WalletAddress } from '@/lib/ty
 import type { DashboardEvent } from '@/lib/types/events'
 import type {
   HealthScore,
-  LambdaSummary,
   LatencyMetrics,
   SeriesBreakdownPoint,
   TimeSeriesPoint,
@@ -35,14 +31,11 @@ export async function getOperationsPageData(input?: TimeRangeInput): Promise<{
   failureReasons: SeriesBreakdownPoint[]
   failureRateByStage: SeriesBreakdownPoint[]
   failuresByNetwork: SeriesBreakdownPoint[]
-  failuresByWallet: SeriesBreakdownPoint[]
   lambdaErrors: SeriesBreakdownPoint[]
-  lambdaSummary: LambdaSummary[]
   apiCallsByRoute: SeriesBreakdownPoint[]
   apiFailuresByRoute: SeriesBreakdownPoint[]
   recentCriticalFailures: DashboardEvent[]
   idempotencyConflicts: SeriesBreakdownPoint[]
-  retryCounts: Array<{ quoteId: string; retryCount: number }>
 }> {
   const [
     health,
@@ -52,14 +45,11 @@ export async function getOperationsPageData(input?: TimeRangeInput): Promise<{
     failureReasons,
     failureRateByStage,
     failuresByNetwork,
-    failuresByWallet,
     lambdaErrors,
-    lambdaSummary,
     apiCallsByRoute,
     apiFailuresByRoute,
     recentCriticalFailures,
     idempotencyConflicts,
-    retryCounts,
   ] = await Promise.all([
     getHealthScore(input),
     getQuoteLatencyPercentiles(input),
@@ -68,14 +58,11 @@ export async function getOperationsPageData(input?: TimeRangeInput): Promise<{
     getFailureReasonBreakdown(input),
     getFailureRateByStage(input),
     getFailuresByNetwork(input),
-    getFailuresByWallet(input, 10),
     getLambdaErrorSummary(input),
-    getLambdaSummary(input),
     getApiCallsByRoute(input),
     getApiFailuresByRoute(input),
     getRecentCriticalFailures(input, 20),
     getIdempotencyConflicts(input),
-    getRetryCountsPerQuote(input),
   ])
 
   return {
@@ -86,14 +73,11 @@ export async function getOperationsPageData(input?: TimeRangeInput): Promise<{
     failureReasons,
     failureRateByStage,
     failuresByNetwork,
-    failuresByWallet,
     lambdaErrors,
-    lambdaSummary,
     apiCallsByRoute,
     apiFailuresByRoute,
     recentCriticalFailures,
     idempotencyConflicts,
-    retryCounts,
   }
 }
 
