@@ -4,14 +4,7 @@ import { MetricCard } from '@/components/dashboard/cards'
 import { EventTable, WalletTable } from '@/components/dashboard/tables'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getOverviewPageData } from '@/lib/data/dashboard'
-
-function pct(value: number): string {
-  return `${value.toFixed(1)}%`
-}
-
-function money(value: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value)
-}
+import { money, pct } from '@/lib/format'
 
 export default async function OverviewPage() {
   const data = await getOverviewPageData()

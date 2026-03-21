@@ -7,15 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { money } from '@/lib/format'
 import type { DashboardEvent } from '@/lib/types/events'
 import type { QuoteFacts } from '@/lib/types/transaction'
 import type { WalletFacts } from '@/lib/types/wallet'
-
-function money(value?: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(
-    value ?? 0,
-  )
-}
 
 export function WalletTable({ wallets }: { wallets: WalletFacts[] }) {
   return (

@@ -3,10 +3,7 @@ import { EventTable, TransactionTable } from '@/components/dashboard/tables'
 import { MetricCard } from '@/components/dashboard/cards'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getWalletDetailPageData } from '@/lib/data/wallets'
-
-function money(value: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value)
-}
+import { money } from '@/lib/format'
 
 export default async function WalletDetailPage({ params }: { params: Promise<{ address: string }> }) {
   const { address } = await params
