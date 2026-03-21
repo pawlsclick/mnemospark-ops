@@ -53,9 +53,7 @@ export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFa
       lastEventType: quote.finalStatus,
     }
 
-    // This is a bug - it double-counts. Quotes are built from events, so we use the quote_created event type.
-    // existing.totalQuotes += quote.hasQuoteCreated ? 1 : 0
-    // We will count quotes from the events stream instead.
+    existing.totalQuotes += quote.hasQuoteCreated ? 1 : 0
     existing.totalUploadsStarted += quote.hasUploadStarted ? 1 : 0
     existing.totalUploadsConfirmed += quote.hasUploadConfirmed ? 1 : 0
     existing.totalPaymentsSettled += quote.hasPaymentSettled ? 1 : 0
@@ -104,11 +102,6 @@ export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFa
           lastEventType: event.eventType,
           lastNetwork: event.network,
         })
-      }
-    } else if (event.eventType === 'quote_created') {
-      const existing = grouped.get(normalizedWalletAddress)
-      if (existing) {
-        existing.totalQuotes = (existing.totalQuotes ?? 0) + 1
       }
     }
   }
