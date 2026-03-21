@@ -183,15 +183,15 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
           : undefined
     const route = str(row.route ?? row.path)
     const status =
-      route === '/price-storage'
-        ? 'quote_created'
-        : route === '/storage/upload'
-          ? 'upload_started'
-        : route === '/storage/upload/confirm'
-          ? 'upload_confirmed'
-          : apiStatusCode && apiStatusCode >= 400
-            ? 'failed'
-            : normalizeStatus(row.status, row.reason ?? row.error)
+      apiStatusCode && apiStatusCode >= 400
+        ? 'failed'
+        : route === '/price-storage'
+          ? 'quote_created'
+          : route === '/storage/upload'
+            ? 'upload_started'
+            : route === '/storage/upload/confirm'
+              ? 'upload_confirmed'
+              : normalizeStatus(row.status, row.reason ?? row.error)
     events.push({
       eventId: `api:${row.request_id}`,
       timestamp:

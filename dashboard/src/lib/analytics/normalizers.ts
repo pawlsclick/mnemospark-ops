@@ -49,7 +49,7 @@ export function normalizeStatus(rawStatus?: string, rawReason?: string | null): 
   if (
     status.includes('payment_settle') ||
     status.includes('settled') ||
-    status.includes('confirmed') ||
+    status === 'confirmed' ||
     status.includes('payment_success')
   ) {
     return 'payment_settled'
