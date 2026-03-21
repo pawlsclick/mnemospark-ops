@@ -84,6 +84,7 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
       grouped.set(event.quoteId, existing)
     }
 
+    existing.firstSeenAt = minIso(existing.firstSeenAt, event.timestamp)
     existing.lastSeenAt = maxIso(existing.lastSeenAt, event.timestamp)
     if (event.requestId && !existing.requestIds.includes(event.requestId)) {
       existing.requestIds.push(event.requestId)

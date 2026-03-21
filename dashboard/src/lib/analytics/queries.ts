@@ -175,7 +175,7 @@ export async function getActiveWallets(input?: { hours?: number }): Promise<numb
   const uniqueWallets = new Set<string>()
   for (const event of events) {
     if (event.walletAddress) {
-      uniqueWallets.add(event.walletAddress)
+      uniqueWallets.add(normalizeWalletAddress(event.walletAddress))
     }
   }
   return uniqueWallets.size
