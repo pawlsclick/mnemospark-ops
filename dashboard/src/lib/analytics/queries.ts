@@ -10,7 +10,7 @@ import type {
   TimeRangeInput,
   WalletAddress,
 } from '@/lib/types/api'
-import type { DashboardEvent, FailureCategory } from '@/lib/types/events'
+import type { DashboardEvent, EventFacts, FailureCategory } from '@/lib/types/events'
 import type {
   FunnelMetrics,
   HealthScore,
@@ -22,6 +22,95 @@ import type {
 } from '@/lib/types/metrics'
 import type { QuoteFacts } from '@/lib/types/transaction'
 import type { WalletDetail, WalletFacts } from '@/lib/types/wallet'
+
+// Simple in-memory cache for derived facts
+const CACHE_TTL_MS = 30 * 1000 // 30 seconds
+type CacheEntry<T> = { data: T; timestamp: number }
+const cache = {
+  eventFacts: new Map<string, CacheEntry<EventFacts[]>>(),
+  quoteFacts: new Map<string, CacheEntry<QuoteFacts[]>>(),
+  walletFacts: new Map<string, CacheEntry<WalletFacts[]>>(),
+}
+const inFlight = {
+  eventFacts: new Map<string, Promise<EventFacts[]>>(),
+  quoteFacts: new Map<string, Promise<QuoteFacts[]>>(),
+  walletFacts: new Map<string, Promise<WalletFacts[]>>(),
+}
+
+function timeRangeKey(input?: TimeRangeInput): string {
+  return `${input?.from ?? ''}|${input?.to ?? ''}|${input?.route ?? ''}`
+}
+
+function isFresh(timestamp: number): boolean {
+  return Date.now() - timestamp < CACHE_TTL_MS
+}
+
+async function getCachedEventFacts(input?: TimeRangeInput): Promise<EventFacts[]> {
+  const key = timeRangeKey(input)
+  const cached = cache.eventFacts.get(key)
+  if (cached && isFresh(cached.timestamp)) {
+    return cached.data
+  }
+
+  const pending = inFlight.eventFacts.get(key)
+  if (pending) return pending
+
+  const request = buildEventFacts(input)
+    .then((data) => {
+      cache.eventFacts.set(key, { data, timestamp: Date.now() })
+      return data
+    })
+    .finally(() => {
+      inFlight.eventFacts.delete(key)
+    })
+  inFlight.eventFacts.set(key, request)
+  return request
+}
+
+async function getCachedQuoteFacts(input?: TimeRangeInput): Promise<QuoteFacts[]> {
+  const key = timeRangeKey(input)
+  const cached = cache.quoteFacts.get(key)
+  if (cached && isFresh(cached.timestamp)) {
+    return cached.data
+  }
+
+  const pending = inFlight.quoteFacts.get(key)
+  if (pending) return pending
+
+  const request = buildQuoteFacts(input)
+    .then((data) => {
+      cache.quoteFacts.set(key, { data, timestamp: Date.now() })
+      return data
+    })
+    .finally(() => {
+      inFlight.quoteFacts.delete(key)
+    })
+  inFlight.quoteFacts.set(key, request)
+  return request
+}
+
+async function getCachedWalletFacts(input?: TimeRangeInput): Promise<WalletFacts[]> {
+  const key = timeRangeKey(input)
+  const cached = cache.walletFacts.get(key)
+  if (cached && isFresh(cached.timestamp)) {
+    return cached.data
+  }
+
+  const pending = inFlight.walletFacts.get(key)
+  if (pending) return pending
+
+  const request = buildWalletFacts(input)
+    .then((data) => {
+      cache.walletFacts.set(key, { data, timestamp: Date.now() })
+      return data
+    })
+    .finally(() => {
+      inFlight.walletFacts.delete(key)
+    })
+  inFlight.walletFacts.set(key, request)
+  return request
+}
+
 
 function toDayBucket(value: string): string {
   return value.slice(0, 10)
@@ -79,8 +168,21 @@ function normalizeWalletAddress(walletAddress: string): string {
   return walletAddress.trim().toLowerCase()
 }
 
+export async function getActiveWallets(input?: { hours?: number }): Promise<number> {
+  const hours = input?.hours ?? 24
+  const from = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+  const events = await getCachedEventFacts({ from })
+  const uniqueWallets = new Set<string>()
+  for (const event of events) {
+    if (event.walletAddress) {
+      uniqueWallets.add(normalizeWalletAddress(event.walletAddress))
+    }
+  }
+  return uniqueWallets.size
+}
+
 export async function getRevenueDaily(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const bucket = new Map<string, number>()
 
   for (const fact of facts) {
@@ -93,7 +195,7 @@ export async function getRevenueDaily(input?: TimeRangeInput): Promise<TimeSerie
 }
 
 export async function getRevenueWeekly(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const bucket = new Map<string, number>()
   for (const fact of facts) {
     if (!fact.hasPaymentSettled || !fact.paymentSettledAt) continue
@@ -104,7 +206,7 @@ export async function getRevenueWeekly(input?: TimeRangeInput): Promise<TimeSeri
 }
 
 export async function getRevenueMonthly(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const bucket = new Map<string, number>()
   for (const fact of facts) {
     if (!fact.hasPaymentSettled || !fact.paymentSettledAt) continue
@@ -115,7 +217,7 @@ export async function getRevenueMonthly(input?: TimeRangeInput): Promise<TimeSer
 }
 
 export async function getRevenueMetrics(input?: TimeRangeInput): Promise<RevenueMetrics> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const now = new Date()
   const oneDay = 24 * 60 * 60 * 1000
   const sevenDays = 7 * oneDay
@@ -151,17 +253,17 @@ export async function getRevenueMetrics(input?: TimeRangeInput): Promise<Revenue
 }
 
 export async function getTopWalletsByRevenue(input?: TimeRangeInput, limit = 10): Promise<WalletFacts[]> {
-  const wallets = await buildWalletFacts(input)
+  const wallets = await getCachedWalletFacts(input)
   return [...wallets].sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, limit)
 }
 
 export async function getTopWalletsByFrequency(input?: TimeRangeInput, limit = 10): Promise<WalletFacts[]> {
-  const wallets = await buildWalletFacts(input)
+  const wallets = await getCachedWalletFacts(input)
   return [...wallets].sort((a, b) => b.totalQuotes - a.totalQuotes).slice(0, limit)
 }
 
 export async function getRevenueByNetwork(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const map = new Map<string, number>()
 
   for (const fact of facts) {
@@ -174,7 +276,7 @@ export async function getRevenueByNetwork(input?: TimeRangeInput): Promise<Serie
 }
 
 export async function getWalletGrowthDaily(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const wallets = await buildWalletFacts(input)
+  const wallets = await getCachedWalletFacts(input)
   const bucket = new Map<string, number>()
 
   for (const wallet of wallets) {
@@ -187,7 +289,7 @@ export async function getWalletGrowthDaily(input?: TimeRangeInput): Promise<Time
 }
 
 export async function getWalletRetentionCohort(input?: TimeRangeInput): Promise<Array<Record<string, unknown>>> {
-  const wallets = await buildWalletFacts(input)
+  const wallets = await getCachedWalletFacts(input)
   return wallets.map((wallet) => {
     const first = wallet.firstSeenAt ? new Date(wallet.firstSeenAt).getTime() : 0
     const last = wallet.lastSeenAt ? new Date(wallet.lastSeenAt).getTime() : first
@@ -203,13 +305,13 @@ export async function getWalletRetentionCohort(input?: TimeRangeInput): Promise<
 }
 
 export async function getWalletList(input?: TimeRangeInput): Promise<WalletFacts[]> {
-  return buildWalletFacts(input)
+  return getCachedWalletFacts(input)
 }
 
 export async function getWalletDetail(walletAddress: WalletAddress, input?: TimeRangeInput): Promise<WalletDetail> {
   const [wallets, quotes, events] = await Promise.all([
-    buildWalletFacts(input),
-    buildQuoteFacts(input),
+    getCachedWalletFacts(input),
+    getCachedQuoteFacts(input),
     buildDashboardEvents(input),
   ])
 
@@ -227,7 +329,7 @@ export async function getWalletDetail(walletAddress: WalletAddress, input?: Time
 }
 
 export async function getQuoteFunnelSummary(input?: TimeRangeInput): Promise<FunnelMetrics> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const quoteCreated = facts.filter((f) => f.hasQuoteCreated).length
   const paymentSettled = facts.filter((f) => f.hasPaymentSettled).length
   const uploadStarted = facts.filter((f) => f.hasUploadStarted).length
@@ -255,7 +357,7 @@ export async function getDropoffByStage(input?: TimeRangeInput): Promise<SeriesB
 }
 
 export async function getQuoteLatencyPercentiles(input?: TimeRangeInput): Promise<LatencyMetrics> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const quoteToPayment: number[] = []
   const paymentToUpload: number[] = []
   const uploadToConfirm: number[] = []
@@ -283,7 +385,7 @@ export async function getQuoteLatencyPercentiles(input?: TimeRangeInput): Promis
 }
 
 export async function getFailureReasonBreakdown(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
 
   for (const event of events) {
@@ -296,7 +398,7 @@ export async function getFailureReasonBreakdown(input?: TimeRangeInput): Promise
 }
 
 export async function getFailureRateByStage(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const total = facts.length || 1
 
   const values = new Map<string, number>([
@@ -311,7 +413,7 @@ export async function getFailureRateByStage(input?: TimeRangeInput): Promise<Ser
 }
 
 export async function getFailuresOverTime(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
   for (const event of events) {
     if (!event.isFailure) continue
@@ -322,7 +424,7 @@ export async function getFailuresOverTime(input?: TimeRangeInput): Promise<TimeS
 }
 
 export async function getFailuresByWallet(input?: TimeRangeInput, limit = 10): Promise<SeriesBreakdownPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
   for (const event of events) {
     if (!event.isFailure || !event.walletAddress) continue
@@ -332,7 +434,7 @@ export async function getFailuresByWallet(input?: TimeRangeInput, limit = 10): P
 }
 
 export async function getFailuresByNetwork(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
   for (const event of events) {
     if (!event.isFailure) continue
@@ -343,7 +445,7 @@ export async function getFailuresByNetwork(input?: TimeRangeInput): Promise<Seri
 }
 
 export async function getEventRatePerMinute(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
   for (const event of events) {
     const key = event.timestamp.slice(0, 16)
@@ -353,7 +455,7 @@ export async function getEventRatePerMinute(input?: TimeRangeInput): Promise<Tim
 }
 
 export async function getLambdaErrorSummary(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
 
   for (const logical of KNOWN_LAMBDA_LOGICAL_NAMES) {
@@ -370,7 +472,7 @@ export async function getLambdaErrorSummary(input?: TimeRangeInput): Promise<Ser
 }
 
 export async function getApiCallsByRoute(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
   for (const route of KNOWN_ROUTES) {
     map.set(route, 0)
@@ -389,7 +491,7 @@ export async function getApiCallsByRoute(input?: TimeRangeInput): Promise<Series
 }
 
 export async function getApiFailuresByRoute(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const map = new Map<string, number>()
   for (const route of KNOWN_ROUTES) {
     map.set(route, 0)
@@ -408,7 +510,7 @@ export async function getApiFailuresByRoute(input?: TimeRangeInput): Promise<Ser
 }
 
 export async function getHealthScore(input?: TimeRangeInput): Promise<HealthScore> {
-  const [events, latencies] = await Promise.all([buildEventFacts(input), getQuoteLatencyPercentiles(input)])
+  const [events, latencies] = await Promise.all([getCachedEventFacts(input), getQuoteLatencyPercentiles(input)])
 
   const total = events.length || 1
   const failures = events.filter((event) => event.isFailure).length
@@ -498,7 +600,7 @@ export async function getRootCausePanel(input: {
 }
 
 export async function getIdempotencyConflicts(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const counts = new Map<string, number>()
   for (const event of events) {
     if (!event.idempotencyKey) continue
@@ -513,7 +615,7 @@ export async function getIdempotencyConflicts(input?: TimeRangeInput): Promise<S
 }
 
 export async function getRetryCountsPerQuote(input?: TimeRangeInput): Promise<Array<{ quoteId: QuoteId; retryCount: number }>> {
-  const facts = await buildQuoteFacts(input)
+  const facts = await getCachedQuoteFacts(input)
   return facts
     .map((fact) => ({ quoteId: fact.quoteId, retryCount: Math.max(0, fact.transIds.length - 1) }))
     .filter((row) => row.retryCount > 0)
@@ -521,7 +623,7 @@ export async function getRetryCountsPerQuote(input?: TimeRangeInput): Promise<Ar
 }
 
 export async function getObjectDuplicateSummary(input?: TimeRangeInput): Promise<Array<{ objectIdHash: ObjectIdHash; quoteCount: number }>> {
-  const facts = await buildQuoteFacts(input)
+  const facts = await getCachedQuoteFacts(input)
   const map = new Map<string, Set<string>>()
 
   for (const fact of facts) {
@@ -554,7 +656,7 @@ export async function getLiveEvents(limit = 25): Promise<DashboardEvent[]> {
 }
 
 export async function getLambdaSummary(input?: TimeRangeInput): Promise<LambdaSummary[]> {
-  const events = await buildEventFacts(input)
+  const events = await getCachedEventFacts(input)
   const summaries = new Map<string, LambdaSummary>()
 
   for (const row of EMPTY_LAMBDA_SUMMARIES) {
@@ -594,7 +696,7 @@ export async function getRecentCriticalFailures(input?: TimeRangeInput, limit = 
 }
 
 export async function getNewVsReturningWallets(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const wallets = await buildWalletFacts(input)
+  const wallets = await getCachedWalletFacts(input)
   let newCount = 0
   let returningCount = 0
   for (const wallet of wallets) {
@@ -610,7 +712,7 @@ export async function getNewVsReturningWallets(input?: TimeRangeInput): Promise<
 }
 
 export async function getTransactionStatusDistribution(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
+  const facts = quoteFactsInRange(await getCachedQuoteFacts(input), input)
   const map = new Map<string, number>()
   for (const fact of facts) {
     map.set(fact.finalStatus, (map.get(fact.finalStatus) ?? 0) + 1)
@@ -619,7 +721,7 @@ export async function getTransactionStatusDistribution(input?: TimeRangeInput): 
 }
 
 export async function getQuoteFacts(input?: TimeRangeInput): Promise<QuoteFacts[]> {
-  return buildQuoteFacts(input)
+  return getCachedQuoteFacts(input)
 }
 
 export async function getDashboardEvents(input?: TimeRangeInput): Promise<DashboardEvent[]> {

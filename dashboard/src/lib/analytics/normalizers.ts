@@ -46,7 +46,12 @@ export function normalizeStatus(rawStatus?: string, rawReason?: string | null): 
     return 'quote_created'
   }
 
-  if (status.includes('payment_settle') || status.includes('settled') || status.includes('payment_success')) {
+  if (
+    status.includes('payment_settle') ||
+    status.includes('settled') ||
+    status.includes('confirmed') ||
+    status.includes('payment_success')
+  ) {
     return 'payment_settled'
   }
 

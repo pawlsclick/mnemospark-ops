@@ -1,7 +1,8 @@
 import { buildEventFacts } from '@/lib/analytics/event-facts'
-import { normalizeFailureCategory } from '@/lib/analytics/normalizers'
+import { coerceIsoDate, normalizeFailureCategory } from '@/lib/analytics/normalizers'
 import type { TimeRangeInput } from '@/lib/types/api'
 import type { QuoteFacts } from '@/lib/types/transaction'
+import { fetchApiCallRows } from '../aws/dynamodb'
 
 function minIso(a?: string, b?: string): string | undefined {
   if (!a) return b
@@ -16,56 +17,102 @@ function maxIso(a?: string, b?: string): string | undefined {
 }
 
 export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFacts[]> {
-  const events = await buildEventFacts(input)
+  // 1. Get ALL events and all price-storage API calls
+  const [events, priceStorageCalls] = await Promise.all([
+    buildEventFacts(input),
+    fetchApiCallRows({ ...input, route: '/price-storage' }),
+  ])
+
   const grouped = new Map<string, QuoteFacts>()
 
-  for (const event of events) {
-    if (!event.quoteId) continue
+  // 2. Seed the map with every quote ever created from the API calls table
+  for (const call of priceStorageCalls) {
+    if (!call.quote_id) continue
+    const callTimestamp =
+      coerceIsoDate(
+        call.event_ts ??
+          call.created_at ??
+          (typeof call.timestamp === 'string' || typeof call.timestamp === 'number'
+            ? call.timestamp
+            : undefined),
+      ) ?? new Date().toISOString()
 
-    const existing = grouped.get(event.quoteId) ?? {
-      quoteId: event.quoteId,
-      walletAddress: event.walletAddress,
-      network: event.network,
-      amountNormalized: event.amountNormalized,
-      hasQuoteCreated: false,
+    grouped.set(call.quote_id, {
+      quoteId: call.quote_id,
+      walletAddress: call.wallet_address,
+      hasQuoteCreated: true,
+      quoteCreatedAt: callTimestamp,
+      firstSeenAt: callTimestamp,
+      lastSeenAt: callTimestamp,
       hasPaymentSettled: false,
       hasUploadStarted: false,
       hasUploadConfirmed: false,
       hasFailure: false,
-      finalStatus: 'unknown',
-      requestIds: [],
+      finalStatus: 'quote_created',
+      requestIds: [call.request_id],
       transIds: [],
       idempotencyKeys: [],
-      firstSeenAt: event.timestamp,
-      lastSeenAt: event.timestamp,
-      objectId: (event.metadata?.object_id as string | undefined) ?? undefined,
-      objectIdHash: (event.metadata?.object_id_hash as string | undefined) ?? undefined,
-      objectKey: (event.metadata?.object_key as string | undefined) ?? undefined,
+      objectId: typeof call.object_id === 'string' ? call.object_id : undefined,
+      objectIdHash: typeof call.object_id_hash === 'string' ? call.object_id_hash : undefined,
+      objectKey: typeof call.object_key === 'string' ? call.object_key : undefined,
+    })
+  }
+
+  // 3. Iterate through all other events to enrich the quote facts
+  for (const event of events) {
+    if (!event.quoteId) continue
+
+    let existing = grouped.get(event.quoteId)
+    if (!existing) {
+      existing = {
+        quoteId: event.quoteId,
+        walletAddress: event.walletAddress,
+        network: event.network,
+        amountNormalized: event.amountNormalized,
+        hasQuoteCreated: false,
+        hasPaymentSettled: false,
+        hasUploadStarted: false,
+        hasUploadConfirmed: false,
+        hasFailure: false,
+        finalStatus: 'unknown',
+        requestIds: event.requestId ? [event.requestId] : [],
+        transIds: event.transId ? [event.transId] : [],
+        idempotencyKeys: event.idempotencyKey ? [event.idempotencyKey] : [],
+        firstSeenAt: event.timestamp,
+        lastSeenAt: event.timestamp,
+      }
+      grouped.set(event.quoteId, existing)
     }
 
     existing.firstSeenAt = minIso(existing.firstSeenAt, event.timestamp)
     existing.lastSeenAt = maxIso(existing.lastSeenAt, event.timestamp)
-
-    if (!existing.walletAddress && event.walletAddress) existing.walletAddress = event.walletAddress
-    if (!existing.network && event.network) existing.network = event.network
-    if ((!existing.amountNormalized || existing.amountNormalized === 0) && event.amountNormalized) {
-      existing.amountNormalized = event.amountNormalized
+    if (event.requestId && !existing.requestIds.includes(event.requestId)) {
+      existing.requestIds.push(event.requestId)
     }
-
-    if (!existing.objectId && event.metadata?.object_id) {
-      existing.objectId = String(event.metadata.object_id)
+    if (event.transId && !existing.transIds.includes(event.transId)) {
+      existing.transIds.push(event.transId)
     }
-    if (!existing.objectIdHash && event.metadata?.object_id_hash) {
-      existing.objectIdHash = String(event.metadata.object_id_hash)
-    }
-    if (!existing.objectKey && event.metadata?.object_key) {
-      existing.objectKey = String(event.metadata.object_key)
-    }
-
-    if (event.requestId && !existing.requestIds.includes(event.requestId)) existing.requestIds.push(event.requestId)
-    if (event.transId && !existing.transIds.includes(event.transId)) existing.transIds.push(event.transId)
     if (event.idempotencyKey && !existing.idempotencyKeys.includes(event.idempotencyKey)) {
       existing.idempotencyKeys.push(event.idempotencyKey)
+    }
+
+    if (!existing.walletAddress && event.walletAddress) {
+      existing.walletAddress = event.walletAddress
+    }
+    if (!existing.amountNormalized && event.amountNormalized) {
+      existing.amountNormalized = event.amountNormalized
+    }
+    if (!existing.network && event.network) {
+      existing.network = event.network
+    }
+    if (!existing.objectIdHash && typeof event.metadata?.object_id_hash === 'string') {
+      existing.objectIdHash = event.metadata.object_id_hash
+    }
+    if (!existing.objectId && typeof event.metadata?.object_id === 'string') {
+      existing.objectId = event.metadata.object_id
+    }
+    if (!existing.objectKey && typeof event.metadata?.object_key === 'string') {
+      existing.objectKey = event.metadata.object_key
     }
 
     switch (event.normalizedStatus) {
@@ -87,25 +134,27 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
         break
       case 'failed':
         existing.hasFailure = true
-        existing.normalizedReason = event.normalizedReason ?? normalizeFailureCategory(event.rawReason, event.rawStatus)
-        if (event.eventType.includes('payment')) existing.failedStage = 'payment'
-        else if (event.eventType.includes('confirm')) existing.failedStage = 'confirm'
-        else if (event.eventType.includes('upload')) existing.failedStage = 'upload'
-        else if (event.eventType.includes('quote')) existing.failedStage = 'quote'
-        else existing.failedStage = existing.failedStage ?? 'unknown'
+        if (!existing.normalizedReason) {
+            existing.normalizedReason = event.normalizedReason ?? normalizeFailureCategory(event.rawReason, event.rawStatus)
+            const stage = event.eventType.includes('payment') ? 'payment' 
+                        : event.eventType.includes('confirm') ? 'confirm' 
+                        : event.eventType.includes('upload') ? 'upload' 
+                        : event.eventType.includes('quote') ? 'quote' 
+                        : 'unknown';
+            if (!existing.failedStage) {
+                existing.failedStage = stage;
+            }
+        }
         break
       default:
         break
     }
-
-    grouped.set(event.quoteId, existing)
   }
 
+  // 4. Determine the final status based on the most advanced stage reached
   const facts = Array.from(grouped.values())
   for (const fact of facts) {
-    if (fact.hasFailure) {
-      fact.finalStatus = 'failed'
-    } else if (fact.hasUploadConfirmed) {
+    if (fact.hasUploadConfirmed) {
       fact.finalStatus = 'upload_confirmed'
     } else if (fact.hasUploadStarted) {
       fact.finalStatus = 'upload_started'
@@ -113,8 +162,11 @@ export async function buildQuoteFacts(input?: TimeRangeInput): Promise<QuoteFact
       fact.finalStatus = 'payment_settled'
     } else if (fact.hasQuoteCreated) {
       fact.finalStatus = 'quote_created'
-    } else {
-      fact.finalStatus = 'unknown'
+    }
+    // If it has a failure but has reached a later stage, the later stage is more important.
+    // Only mark as failed if it hasn't reached a terminal success state.
+    if (fact.hasFailure && !fact.hasUploadConfirmed) {
+        fact.finalStatus = 'failed'
     }
   }
 

@@ -46,18 +46,35 @@ function inTimeRange(item: Record<string, unknown>, input?: TimeRangeInput): boo
   return true
 }
 
-async function scanAllRows<T>(tableName: string, input?: TimeRangeInput): Promise<T[]> {
+async function scanAllRows<T>(
+  tableName: string,
+  input?: TimeRangeInput & { route?: string },
+): Promise<T[]> {
   const rows: T[] = []
   let lastKey: Record<string, unknown> | undefined
 
+  // Build filter expression if needed
+  const filterExpressions: string[] = []
+  const expressionAttributeValues: Record<string, unknown> = {}
+  const expressionAttributeNames: Record<string, string> = {}
+
+  if (input?.route) {
+    filterExpressions.push('(#route = :route OR #path = :route)')
+    expressionAttributeNames['#route'] = 'route'
+    expressionAttributeNames['#path'] = 'path'
+    expressionAttributeValues[':route'] = input.route
+  }
+
   try {
     do {
-      const response = await docClient.send(
-        new ScanCommand({
-          TableName: tableName,
-          ExclusiveStartKey: lastKey,
-        }),
-      )
+      const command = new ScanCommand({
+        TableName: tableName,
+        ExclusiveStartKey: lastKey,
+        FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(' AND ') : undefined,
+        ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
+        ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
+      })
+      const response = await docClient.send(command)
 
       const pageItems = (response.Items ?? []) as T[]
       for (const row of pageItems) {

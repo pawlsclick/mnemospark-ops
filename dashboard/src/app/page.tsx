@@ -17,7 +17,7 @@ export default async function OverviewPage() {
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard title="Revenue (24h)" value={money(data.revenue.revenue24h)} subtitle="Payment settled" />
-          <MetricCard title="Active wallets" value={`${new Set(data.liveEvents.map((e) => e.walletAddress).filter(Boolean)).size}`} subtitle="Recent event activity" />
+          <MetricCard title="Active wallets" value={`${data.activeWallets}`} subtitle="Last 24 hours" />
           <MetricCard title="Success rate" value={pct(data.health.successRate)} subtitle="Across normalized events" />
           <MetricCard title="Error rate" value={pct(data.health.errorRate)} subtitle="Across normalized events" />
         </div>
@@ -33,7 +33,7 @@ export default async function OverviewPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Funnel snapshot</CardTitle>
+              <CardTitle>Funnel (24h)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p>quote_created: {data.funnel.quoteCreated}</p>

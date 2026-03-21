@@ -85,6 +85,7 @@ export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFa
         if (event.network) existing.lastNetwork = event.network
         existing.lastEventType = event.eventType
       } else {
+        // This logic might create wallets that ONLY have auth failures, which is correct.
         grouped.set(normalizedWalletAddress, {
           walletAddress: event.walletAddress.trim(),
           firstSeenAt: event.timestamp,
