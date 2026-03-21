@@ -17,7 +17,7 @@ export async function getOverviewPageData(input?: TimeRangeInput): Promise<Overv
   const [revenue, funnel, revenueSeries, topWallets, health, liveEvents, activeWallets] = await Promise.all([
     getRevenueMetrics(timeRangeInput),
     getQuoteFunnelSummary(timeRangeInput),
-    getRevenueDaily(timeRangeInput),
+    getRevenueDaily(input),
     getTopWalletsByRevenue(timeRangeInput, 10),
     getHealthScore(timeRangeInput),
     getLiveEvents(25),
