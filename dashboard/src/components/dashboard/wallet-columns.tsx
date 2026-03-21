@@ -3,7 +3,6 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { WalletFacts } from "@/lib/types/wallet"
 import { money } from "@/lib/format"
-import { Badge } from "@/components/ui/badge"
 
 export const columns: ColumnDef<WalletFacts>[] = [
   {
