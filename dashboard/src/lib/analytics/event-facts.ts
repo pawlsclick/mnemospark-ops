@@ -28,6 +28,12 @@ function str(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
+function strOrNumber(value: unknown): string | number | undefined {
+  if (typeof value === 'string') return value.length > 0 ? value : undefined
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return undefined
+}
+
 function severityFromStatus(status: EventFacts['normalizedStatus']): DashboardEvent['severity'] {
   if (status === 'failed') return 'high'
   if (status === 'unknown') return 'medium'
@@ -79,7 +85,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
       quoteId: toQuoteId(row.quote_id),
       requestId: toRequestId(row.request_id),
       network: str(row.network),
-      amountNormalized: normalizeAmount(row.amount ?? str(row.storage_price)),
+      amountNormalized: normalizeAmount(row.amount ?? strOrNumber(row.storage_price)),
       normalizedStatus: status,
       normalizedReason: status === 'failed' ? normalizeFailureCategory(row.reason, row.status) : undefined,
       source: 'quotes',
@@ -107,7 +113,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
           ? row.idempotency_key
           : undefined,
       network: str(row.network ?? row.payment_network),
-      amountNormalized: normalizeAmount(row.amount ?? str(row.payment_amount)),
+      amountNormalized: normalizeAmount(row.amount ?? strOrNumber(row.payment_amount)),
       normalizedStatus: status,
       normalizedReason: status === 'failed' ? normalizeFailureCategory(row.reason, row.status) : undefined,
       route: str(row.route ?? row.path),
@@ -133,7 +139,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
       quoteId: toQuoteId(row.quote_id),
       requestId: toRequestId(row.request_id),
       network: str(row.network),
-      amountNormalized: normalizeAmount(row.amount ?? str(row.storage_price)),
+      amountNormalized: normalizeAmount(row.amount ?? strOrNumber(row.storage_price)),
       normalizedStatus: status,
       normalizedReason: status === 'failed' ? normalizeFailureCategory(row.reason, row.status) : undefined,
       source: 'payments',
