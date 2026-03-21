@@ -46,7 +46,8 @@ function uiStatus(normalized: EventFacts['normalizedStatus']): DashboardEvent['s
   return 'success'
 }
 
-function classifyEventType(source: string, normalizedStatus: EventFacts['normalizedStatus']): string {
+function classifyEventType(source: string, normalizedStatus: EventFacts['normalizedStatus'], route?: string): string {
+  if (route === '/price-storage') return 'quote_created'
   if (source === 'wallet_auth') {
     return normalizedStatus === 'failed' ? 'wallet_auth_failed' : 'wallet_auth_succeeded'
   }
@@ -98,7 +99,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
   }
 
   for (const row of uploads) {
-    const status = normalizeStatus(row.status, row.reason)
+    const status = row.payment_status === 'confirmed' ? 'upload_confirmed' : normalizeStatus(row.status, row.reason)
     events.push({
       eventId: `upload:${row.quote_id}:${row.trans_id}`,
       timestamp:
@@ -180,10 +181,17 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
         : typeof row.status_code === 'string'
           ? Number(row.status_code)
           : undefined
+    const route = str(row.route ?? row.path)
     const status =
-      apiStatusCode && apiStatusCode >= 400
-        ? 'failed'
-        : normalizeStatus(row.status, row.reason ?? row.error)
+      route === '/price-storage'
+        ? 'quote_created'
+        : route === '/storage/upload'
+          ? 'upload_started'
+        : route === '/storage/upload/confirm'
+          ? 'upload_confirmed'
+          : apiStatusCode && apiStatusCode >= 400
+            ? 'failed'
+            : normalizeStatus(row.status, row.reason ?? row.error)
     events.push({
       eventId: `api:${row.request_id}`,
       timestamp:
@@ -192,13 +200,13 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
       walletAddress: toWalletAddress(row.wallet_address),
       quoteId: toQuoteId(row.quote_id),
       requestId: toRequestId(row.request_id),
-      route: str(row.route ?? row.path),
+      route,
       lambdaName: typeof row.lambda_name === 'string' ? row.lambda_name : undefined,
       normalizedStatus: status,
       normalizedReason:
         status === 'failed' ? normalizeFailureCategory(row.error ?? row.reason ?? null, row.status) : undefined,
       source: 'api_calls',
-      eventType: classifyEventType('api_calls', status),
+      eventType: classifyEventType('api_calls', status, route),
       rawStatus: row.status,
       rawReason: row.error ?? row.reason,
       isFailure: status === 'failed',

@@ -33,7 +33,7 @@ export default async function OverviewPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Funnel snapshot</CardTitle>
+              <CardTitle>Funnel (24h)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p>quote_created: {data.funnel.quoteCreated}</p>
