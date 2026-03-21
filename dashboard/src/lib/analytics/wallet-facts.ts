@@ -73,6 +73,9 @@ export async function buildWalletFacts(input?: TimeRangeInput): Promise<WalletFa
       const existing = grouped.get(event.walletAddress)
       if (existing) {
         existing.totalAuthFailures += 1
+        existing.lastSeenAt = maxIso(existing.lastSeenAt, event.timestamp)
+        if (event.network) existing.lastNetwork = event.network
+        existing.lastEventType = event.eventType
       } else {
         grouped.set(event.walletAddress, {
           walletAddress: event.walletAddress,

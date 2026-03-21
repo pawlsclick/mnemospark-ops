@@ -38,16 +38,8 @@ export function coerceIsoDate(value?: string | number | null): ISODateString | u
 export function normalizeStatus(rawStatus?: string, rawReason?: string | null): NormalizedStatus {
   const status = (rawStatus ?? '').toLowerCase()
   const reason = (rawReason ?? '').toLowerCase()
-  const combined = `${status} ${reason}`
-
-  if (
-    combined.includes('error') ||
-    combined.includes('fail') ||
-    combined.includes('revert') ||
-    combined.includes('denied')
-  ) {
-    return 'failed'
-  }
+  const statusLooksFailed =
+    status.includes('error') || status.includes('fail') || status.includes('revert') || status.includes('denied')
 
   if (status.includes('quote') || status.includes('priced') || status.includes('price_storage')) {
     return 'quote_created'
@@ -71,6 +63,10 @@ export function normalizeStatus(rawStatus?: string, rawReason?: string | null): 
     status.includes('upload_initiated')
   ) {
     return 'upload_started'
+  }
+
+  if (statusLooksFailed || reason.includes('error') || reason.includes('fail') || reason.includes('revert') || reason.includes('denied')) {
+    return 'failed'
   }
 
   return 'unknown'

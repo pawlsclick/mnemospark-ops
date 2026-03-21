@@ -37,19 +37,3 @@ export interface QuoteFacts {
   firstSeenAt?: ISODateString
   lastSeenAt?: ISODateString
 }
-
-export interface TransactionSummary {
-  quoteId: string
-  walletAddress?: string
-  objectId?: string
-  objectKey?: string
-  createdAt?: string
-  updatedAt?: string
-  uploadStatus?: string
-  paymentStatus?: string
-  overallStatus: string
-  requestIds?: string[]
-  transIds?: string[]
-  errorCode?: string
-  errorMessage?: string
-}
