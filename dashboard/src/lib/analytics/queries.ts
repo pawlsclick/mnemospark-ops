@@ -4,8 +4,6 @@ import { buildWalletFacts } from '@/lib/analytics/wallet-facts'
 import { fetchAppSyncLiveEvents } from '@/lib/aws/appsync'
 import { EMPTY_LAMBDA_SUMMARIES, KNOWN_LAMBDA_LOGICAL_NAMES, KNOWN_ROUTES } from '@/lib/constants'
 import type {
-  ISODateString,
-  ObjectId,
   ObjectIdHash,
   QuoteId,
   RequestId,
@@ -284,25 +282,6 @@ export async function getQuoteLatencyPercentiles(input?: TimeRangeInput): Promis
   }
 }
 
-export async function getLatencyTrend(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
-  const accum = new Map<string, { total: number; count: number }>()
-
-  for (const fact of facts) {
-    if (!fact.quoteCreatedAt || !fact.uploadConfirmedAt) continue
-    const key = toDayBucket(fact.uploadConfirmedAt)
-    const latency = new Date(fact.uploadConfirmedAt).getTime() - new Date(fact.quoteCreatedAt).getTime()
-    const row = accum.get(key) ?? { total: 0, count: 0 }
-    row.total += latency
-    row.count += 1
-    accum.set(key, row)
-  }
-
-  return Array.from(accum.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([bucket, v]) => ({ bucket, value: v.count === 0 ? 0 : v.total / v.count }))
-}
-
 export async function getFailureReasonBreakdown(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
   const events = await buildEventFacts(input)
   const map = new Map<string, number>()
@@ -426,21 +405,6 @@ export async function getApiFailuresByRoute(input?: TimeRangeInput): Promise<Ser
   }
 
   return toSeriesBreakdown(map)
-}
-
-export async function getActiveWallets(input?: { minutes?: number }): Promise<number> {
-  const minutes = input?.minutes ?? 30
-  const events = await buildDashboardEvents()
-  const cutoff = Date.now() - minutes * 60 * 1000
-
-  const wallets = new Set<string>()
-  for (const event of events) {
-    if (!event.walletAddress) continue
-    if (new Date(event.timestamp).getTime() >= cutoff) {
-      wallets.add(event.walletAddress)
-    }
-  }
-  return wallets.size
 }
 
 export async function getHealthScore(input?: TimeRangeInput): Promise<HealthScore> {
@@ -573,20 +537,6 @@ export async function getObjectDuplicateSummary(input?: TimeRangeInput): Promise
     .sort((a, b) => b.quoteCount - a.quoteCount)
 }
 
-export async function getObjectLifecycle(input: {
-  objectId?: ObjectId
-  objectIdHash?: ObjectIdHash
-}): Promise<DashboardEvent[]> {
-  const events = await buildDashboardEvents()
-  return events
-    .filter((event) => {
-      if (input.objectId && event.objectId === input.objectId) return true
-      if (input.objectIdHash && event.objectIdHash === input.objectIdHash) return true
-      return false
-    })
-    .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-}
-
 export async function getLiveEvents(limit = 25): Promise<DashboardEvent[]> {
   const live = await fetchAppSyncLiveEvents(limit)
   if (live.length > 0) {
@@ -659,27 +609,6 @@ export async function getNewVsReturningWallets(input?: TimeRangeInput): Promise<
   ]
 }
 
-export async function getWalletActivitySeries(input?: TimeRangeInput): Promise<TimeSeriesPoint[]> {
-  const events = await buildDashboardEvents(input)
-  const byDayWalletSet = new Map<string, Set<string>>()
-
-  for (const event of events) {
-    if (!event.walletAddress) continue
-    const day = toDayBucket(event.timestamp)
-    const set = byDayWalletSet.get(day) ?? new Set<string>()
-    set.add(event.walletAddress)
-    byDayWalletSet.set(day, set)
-  }
-
-  return Array.from(byDayWalletSet.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([bucket, wallets]) => ({ bucket, value: wallets.size }))
-}
-
-export async function getTopWalletsByFailures(input?: TimeRangeInput, limit = 10): Promise<SeriesBreakdownPoint[]> {
-  return getFailuresByWallet(input, limit)
-}
-
 export async function getTransactionStatusDistribution(input?: TimeRangeInput): Promise<SeriesBreakdownPoint[]> {
   const facts = quoteFactsInRange(await buildQuoteFacts(input), input)
   const map = new Map<string, number>()
@@ -697,47 +626,3 @@ export async function getDashboardEvents(input?: TimeRangeInput): Promise<Dashbo
   return buildDashboardEvents(input)
 }
 
-export async function getEventFacts(input?: TimeRangeInput) {
-  return buildEventFacts(input)
-}
-
-export async function getFilteredEvents(input?: {
-  from?: ISODateString
-  to?: ISODateString
-  wallet?: string
-  quoteId?: string
-  requestId?: string
-  route?: string
-  lambda?: string
-  status?: 'success' | 'error' | 'pending' | 'info' | 'all'
-}): Promise<DashboardEvent[]> {
-  const events = await buildDashboardEvents({ from: input?.from, to: input?.to })
-  const walletFilter = input?.wallet?.trim().toLowerCase()
-  const quoteFilter = input?.quoteId?.trim()
-  const requestFilter = input?.requestId?.trim()
-  const routeFilter = input?.route?.trim()
-  const lambdaFilter = input?.lambda?.trim()
-  const statusFilter = input?.status && input.status !== 'all' ? input.status : undefined
-
-  return events.filter((event) => {
-    if (walletFilter && (!event.walletAddress || !event.walletAddress.toLowerCase().includes(walletFilter))) {
-      return false
-    }
-    if (quoteFilter && (!event.quoteId || !event.quoteId.includes(quoteFilter))) {
-      return false
-    }
-    if (requestFilter && (!event.requestId || !event.requestId.includes(requestFilter))) {
-      return false
-    }
-    if (routeFilter && event.route !== routeFilter) {
-      return false
-    }
-    if (lambdaFilter && event.lambdaName !== lambdaFilter) {
-      return false
-    }
-    if (statusFilter && event.status !== statusFilter) {
-      return false
-    }
-    return true
-  })
-}
