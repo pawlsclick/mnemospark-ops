@@ -184,7 +184,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
           ? Number(row.status_code)
           : undefined
     const route = str(row.route ?? row.path)
-    const isApiFailure = apiStatusCode ? apiStatusCode >= 400 : false
+    const isApiFailure = typeof apiStatusCode === 'number' && Number.isFinite(apiStatusCode) && apiStatusCode >= 400
     const status =
       route === '/price-storage'
         ? 'quote_created'
@@ -212,7 +212,7 @@ async function buildEventFactsUncached(input?: TimeRangeInput): Promise<EventFac
       eventType: classifyEventType('api_calls', status, route),
       rawStatus: row.status,
       rawReason: row.error ?? row.reason,
-      isFailure: isApiFailure,
+      isFailure: status === 'failed',
       metadata: row,
     })
   }
