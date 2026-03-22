@@ -1,2 +1,5 @@
 # macOS
 .DS_Store
+
+# Local audit notes (not tracked)
+AUDIT_FINDINGS.md
