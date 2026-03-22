@@ -46,21 +46,25 @@ export function normalizeStatus(rawStatus?: string, rawReason?: string | null): 
     return 'quote_created'
   }
 
-  if (
-    status.includes('payment_settle') ||
-    status.includes('settled') ||
-    status.includes('confirmed') ||
-    status.includes('payment_success')
-  ) {
-    return 'payment_settled'
-  }
-
+  // Upload confirmation before payment: a bare `confirmed` substring must not steal upload/confirm rows.
   if (
     status.includes('confirm_transaction_log_written') ||
     status.includes('upload_confirmed') ||
-    status.includes('confirm')
+    (status.includes('upload') && status.includes('confirm'))
   ) {
     return 'upload_confirmed'
+  }
+
+  const settledLooksPositive =
+    (status.includes('settled') && !status.includes('unsettled')) ||
+    status.includes('payment_settle') ||
+    status.includes('payment_success') ||
+    status.includes('already_settled') ||
+    status === 'confirmed' ||
+    (status.includes('payment') && status.includes('confirm') && !status.includes('upload'))
+
+  if (settledLooksPositive) {
+    return 'payment_settled'
   }
 
   if (
