@@ -1,6 +1,7 @@
 /**
- * GraphQL HTTP endpoint for the dashboard API (mnemospark-backend stack output).
- * Use the public name in the browser; align with backend docs when deployed.
+ * GraphQL HTTP endpoint for the dashboard (browser → Next.js → API Gateway).
+ * Prefer same-origin `/api/graphql` so the server route adds `x-api-key` from
+ * `DASHBOARD_GRAPHQL_API_KEY` (never expose that key in public env vars).
  */
 export function getGraphqlHttpUrl(): string | undefined {
   return (
