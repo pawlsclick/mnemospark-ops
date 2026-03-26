@@ -1,0 +1,14 @@
+"""Dashboard GraphQL API (authoritative contract for field-level typing)."""
+type Health {
+  ok: Boolean!
+}
+
+type RevenueSummary {
+  totalCents: Int!
+  currency: String!
+}
+
+type Query {
+  health: Health!
+  revenueSummary: RevenueSummary!
+}
