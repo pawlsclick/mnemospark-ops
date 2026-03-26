@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { TabBar } from "@/components/ui/tab-bar";
 import { graphql } from "@/gql";
+import { formatAmount, overviewWallet } from "@/lib/dashboard-format";
 
 const TABS = [
   { id: "revenue", label: "Revenue" },
@@ -71,19 +72,6 @@ const SalesWalletsQuery = graphql(`
     }
   }
 `);
-
-function overviewWallet(): string {
-  return process.env.NEXT_PUBLIC_DASHBOARD_WALLET_ADDRESS?.trim() ?? "";
-}
-
-function formatAmount(totalAmount: string) {
-  const n = Number.parseFloat(totalAmount);
-  if (Number.isNaN(n)) return totalAmount;
-  return new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(n);
-}
 
 export function SalesTabs() {
   const searchParams = useSearchParams();

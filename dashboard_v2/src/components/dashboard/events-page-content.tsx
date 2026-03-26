@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery } from "@apollo/client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -44,7 +44,7 @@ export function EventsPageContent() {
   const [route, setRoute] = useState(searchParams.get("route") ?? "");
   const [lambdaName, setLambdaName] = useState(searchParams.get("lambda") ?? "");
 
-  const filters = useMemo(() => {
+  const [filters, setFilters] = useState(() => {
     const f: {
       walletAddress?: string;
       quoteId?: string;
@@ -58,13 +58,27 @@ export function EventsPageContent() {
     if (route.trim()) f.route = route.trim();
     if (lambdaName.trim()) f.lambdaName = lambdaName.trim();
     return Object.keys(f).length ? f : undefined;
-  }, [wallet, quoteId, requestId, route, lambdaName]);
+  });
 
-  const { data, loading, error, refetch } = useQuery(EventsQuery, {
+  const { data, loading, error } = useQuery(EventsQuery, {
     variables: { limit: 1500, filters },
   });
 
   const apply = useCallback(() => {
+    const nextFilters: {
+      walletAddress?: string;
+      quoteId?: string;
+      requestId?: string;
+      route?: string;
+      lambdaName?: string;
+    } = {};
+    if (wallet.trim()) nextFilters.walletAddress = wallet.trim();
+    if (quoteId.trim()) nextFilters.quoteId = quoteId.trim();
+    if (requestId.trim()) nextFilters.requestId = requestId.trim();
+    if (route.trim()) nextFilters.route = route.trim();
+    if (lambdaName.trim()) nextFilters.lambdaName = lambdaName.trim();
+    setFilters(Object.keys(nextFilters).length ? nextFilters : undefined);
+
     const params = new URLSearchParams();
     if (wallet.trim()) params.set("wallet", wallet.trim());
     if (quoteId.trim()) params.set("quoteId", quoteId.trim());
@@ -72,8 +86,7 @@ export function EventsPageContent() {
     if (route.trim()) params.set("route", route.trim());
     if (lambdaName.trim()) params.set("lambda", lambdaName.trim());
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    void refetch();
-  }, [wallet, quoteId, requestId, route, lambdaName, pathname, router, refetch]);
+  }, [wallet, quoteId, requestId, route, lambdaName, pathname, router]);
 
   const clear = useCallback(() => {
     setWallet("");
@@ -81,9 +94,9 @@ export function EventsPageContent() {
     setRequestId("");
     setRoute("");
     setLambdaName("");
+    setFilters(undefined);
     router.replace(pathname, { scroll: false });
-    void refetch();
-  }, [pathname, router, refetch]);
+  }, [pathname, router]);
 
   const rows = data?.dashboardEvents ?? [];
 

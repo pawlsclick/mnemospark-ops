@@ -201,8 +201,16 @@ export function OperationsTabs() {
                       <dd>{healthQ.data.quoteLatencyPercentiles.paymentToUploadP50.toFixed(0)}</dd>
                     </div>
                     <div className="flex justify-between">
+                      <dt>Payment→Upload p95</dt>
+                      <dd>{healthQ.data.quoteLatencyPercentiles.paymentToUploadP95.toFixed(0)}</dd>
+                    </div>
+                    <div className="flex justify-between">
                       <dt>Upload→Confirm p50</dt>
                       <dd>{healthQ.data.quoteLatencyPercentiles.uploadToConfirmP50.toFixed(0)}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Upload→Confirm p95</dt>
+                      <dd>{healthQ.data.quoteLatencyPercentiles.uploadToConfirmP95.toFixed(0)}</dd>
                     </div>
                   </dl>
                 ) : null}
