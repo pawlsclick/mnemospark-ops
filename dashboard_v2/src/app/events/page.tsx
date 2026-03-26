@@ -1,31 +1,25 @@
+import { Suspense } from "react";
+
 import { AppShell } from "@/components/dashboard/app-shell";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { EventsPageContent } from "@/components/dashboard/events-page-content";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EventsPage() {
   return (
     <AppShell
       title="Events"
-      description="Filterable event stream, rate charts, and Lambda error breakdown."
+      description="Filterable event stream aligned with v1 (GraphQL-backed)."
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Events</CardTitle>
-          <CardDescription>
-            Filters, event rate per minute, Lambda errors, and full stream.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            GraphQL-backed events explorer is planned for Phase 2 (v1 parity).
-          </p>
-        </CardContent>
-      </Card>
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        }
+      >
+        <EventsPageContent />
+      </Suspense>
     </AppShell>
   );
 }

@@ -1,11 +1,5 @@
 import { AppShell } from "@/components/dashboard/app-shell";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { TransactionsPageContent } from "@/components/dashboard/transactions-page-content";
 
 export default function TransactionsPage() {
   return (
@@ -13,20 +7,7 @@ export default function TransactionsPage() {
       title="Transactions"
       description="Quote-centric flows, status distribution, and object duplicate analysis."
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Transactions</CardTitle>
-          <CardDescription>
-            Status distribution, object duplicates, and the quote flows table.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            GraphQL-backed transaction explorer is planned for Phase 2 (v1
-            parity).
-          </p>
-        </CardContent>
-      </Card>
+      <TransactionsPageContent />
     </AppShell>
   );
 }

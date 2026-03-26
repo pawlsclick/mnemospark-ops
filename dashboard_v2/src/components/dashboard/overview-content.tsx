@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { graphql } from "@/gql";
+import { formatAmount, overviewWallet } from "@/lib/dashboard-format";
 
 const HealthCheckDocument = graphql(`
   query HealthCheck {
@@ -30,21 +31,6 @@ const RevenueOverviewDocument = graphql(`
     }
   }
 `);
-
-function overviewWallet(): string {
-  return process.env.NEXT_PUBLIC_DASHBOARD_WALLET_ADDRESS?.trim() ?? "";
-}
-
-function formatAmount(totalAmount: string) {
-  const n = Number.parseFloat(totalAmount);
-  if (Number.isNaN(n)) {
-    return totalAmount;
-  }
-  return new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(n);
-}
 
 export function OverviewContent() {
   const wallet = overviewWallet();
