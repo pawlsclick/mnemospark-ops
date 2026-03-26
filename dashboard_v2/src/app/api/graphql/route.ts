@@ -53,19 +53,20 @@ export async function POST(request: NextRequest) {
   }
 
   const proxyAuthEnabled = Boolean(proxyUsername || proxyPassword);
-  if (proxyAuthEnabled && (!proxyUsername || !proxyPassword)) {
-    return graphQlErrorResponse(
-      "GraphQL proxy basic auth is misconfigured (set both DASHBOARD_GRAPHQL_PROXY_USERNAME and DASHBOARD_GRAPHQL_PROXY_PASSWORD).",
-      503,
-    );
-  }
-
-  if (proxyAuthEnabled && !isAuthorized(request, proxyUsername, proxyPassword)) {
-    return graphQlErrorResponse(
-      "Unauthorized.",
-      401,
-      { "WWW-Authenticate": AUTH_CHALLENGE },
-    );
+  if (proxyAuthEnabled) {
+    if (!proxyUsername || !proxyPassword) {
+      return graphQlErrorResponse(
+        "GraphQL proxy basic auth is misconfigured (set both DASHBOARD_GRAPHQL_PROXY_USERNAME and DASHBOARD_GRAPHQL_PROXY_PASSWORD).",
+        503,
+      );
+    }
+    if (!isAuthorized(request, proxyUsername, proxyPassword)) {
+      return graphQlErrorResponse(
+        "Unauthorized.",
+        401,
+        { "WWW-Authenticate": AUTH_CHALLENGE },
+      );
+    }
   }
 
   const body = await request.text();
