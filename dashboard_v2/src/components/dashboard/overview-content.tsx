@@ -13,28 +13,51 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { graphql } from "@/gql";
 
-const DashboardOverviewDocument = graphql(`
-  query DashboardOverview {
+const HealthCheckDocument = graphql(`
+  query HealthCheck {
     health {
       ok
-    }
-    revenueSummary {
-      totalCents
-      currency
     }
   }
 `);
 
-function formatMoney(cents: number, currency: string) {
+const RevenueOverviewDocument = graphql(`
+  query RevenueOverview($walletAddress: String!) {
+    revenueSummary(walletAddress: $walletAddress) {
+      walletAddress
+      confirmedPaymentCount
+      totalAmount
+    }
+  }
+`);
+
+function overviewWallet(): string {
+  return process.env.NEXT_PUBLIC_DASHBOARD_WALLET_ADDRESS?.trim() ?? "";
+}
+
+function formatAmount(totalAmount: string) {
+  const n = Number.parseFloat(totalAmount);
+  if (Number.isNaN(n)) {
+    return totalAmount;
+  }
   return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(n);
 }
 
 export function OverviewContent() {
-  const { data, loading, error, refetch } = useQuery(DashboardOverviewDocument);
+  const wallet = overviewWallet();
+
+  const healthQuery = useQuery(HealthCheckDocument);
+  const revenueQuery = useQuery(RevenueOverviewDocument, {
+    variables: { walletAddress: wallet },
+    skip: !wallet,
+  });
+
+  const loading =
+    healthQuery.loading || (!wallet ? false : revenueQuery.loading);
+  const error = healthQuery.error ?? revenueQuery.error;
 
   if (loading) {
     return (
@@ -53,7 +76,14 @@ export function OverviewContent() {
           <CardDescription>{error.message}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button type="button" variant="outline" onClick={() => refetch()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              void healthQuery.refetch();
+              if (wallet) void revenueQuery.refetch();
+            }}
+          >
             Retry
           </Button>
         </CardContent>
@@ -61,8 +91,8 @@ export function OverviewContent() {
     );
   }
 
-  const healthOk = data?.health.ok ?? false;
-  const summary = data?.revenueSummary;
+  const healthOk = healthQuery.data?.health.ok ?? false;
+  const summary = revenueQuery.data?.revenueSummary;
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -87,14 +117,28 @@ export function OverviewContent() {
         <CardHeader>
           <CardTitle>Revenue summary</CardTitle>
           <CardDescription>
-            GraphQL revenueSummary (read-only)
+            GraphQL revenueSummary (read-only, ledger-backed)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {summary ? (
-            <p className="text-2xl font-semibold tabular-nums">
-              {formatMoney(summary.totalCents, summary.currency)}
+          {!wallet ? (
+            <p className="text-sm text-muted-foreground">
+              Set{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                NEXT_PUBLIC_DASHBOARD_WALLET_ADDRESS
+              </code>{" "}
+              to a wallet address to load revenue for that wallet.
             </p>
+          ) : summary ? (
+            <>
+              <p className="text-2xl font-semibold tabular-nums">
+                {formatAmount(summary.totalAmount)}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {summary.confirmedPaymentCount} confirmed payments ·{" "}
+                {summary.walletAddress}
+              </p>
+            </>
           ) : (
             <p className="text-muted-foreground">No data</p>
           )}

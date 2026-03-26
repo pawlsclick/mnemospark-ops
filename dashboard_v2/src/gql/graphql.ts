@@ -16,7 +16,7 @@ export type Scalars = {
   Float: { input: number; output: number; }
 };
 
-/** Dashboard GraphQL API (authoritative contract for field-level typing). */
+/** Dashboard GraphQL API (align with mnemospark-backend services/dashboard_graphql). */
 export type Health = {
   __typename?: 'Health';
   ok: Scalars['Boolean']['output'];
@@ -28,16 +28,30 @@ export type Query = {
   revenueSummary: RevenueSummary;
 };
 
-export type RevenueSummary = {
-  __typename?: 'RevenueSummary';
-  currency: Scalars['String']['output'];
-  totalCents: Scalars['Int']['output'];
+
+export type QueryRevenueSummaryArgs = {
+  walletAddress: Scalars['String']['input'];
 };
 
-export type DashboardOverviewQueryVariables = Exact<{ [key: string]: never; }>;
+export type RevenueSummary = {
+  __typename?: 'RevenueSummary';
+  confirmedPaymentCount: Scalars['Int']['output'];
+  totalAmount: Scalars['String']['output'];
+  walletAddress: Scalars['String']['output'];
+};
+
+export type HealthCheckQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type DashboardOverviewQuery = { __typename?: 'Query', health: { __typename?: 'Health', ok: boolean }, revenueSummary: { __typename?: 'RevenueSummary', totalCents: number, currency: string } };
+export type HealthCheckQuery = { __typename?: 'Query', health: { __typename?: 'Health', ok: boolean } };
+
+export type RevenueOverviewQueryVariables = Exact<{
+  walletAddress: Scalars['String']['input'];
+}>;
 
 
-export const DashboardOverviewDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DashboardOverview"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"health"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ok"}}]}},{"kind":"Field","name":{"kind":"Name","value":"revenueSummary"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalCents"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}}]}}]}}]} as unknown as DocumentNode<DashboardOverviewQuery, DashboardOverviewQueryVariables>;
+export type RevenueOverviewQuery = { __typename?: 'Query', revenueSummary: { __typename?: 'RevenueSummary', walletAddress: string, confirmedPaymentCount: number, totalAmount: string } };
+
+
+export const HealthCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"HealthCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"health"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ok"}}]}}]}}]} as unknown as DocumentNode<HealthCheckQuery, HealthCheckQueryVariables>;
+export const RevenueOverviewDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"RevenueOverview"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"walletAddress"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revenueSummary"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"walletAddress"},"value":{"kind":"Variable","name":{"kind":"Name","value":"walletAddress"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"walletAddress"}},{"kind":"Field","name":{"kind":"Name","value":"confirmedPaymentCount"}},{"kind":"Field","name":{"kind":"Name","value":"totalAmount"}}]}}]}}]} as unknown as DocumentNode<RevenueOverviewQuery, RevenueOverviewQueryVariables>;

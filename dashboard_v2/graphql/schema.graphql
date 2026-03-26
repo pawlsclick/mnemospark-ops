@@ -1,14 +1,15 @@
-"""Dashboard GraphQL API (authoritative contract for field-level typing)."""
+"""Dashboard GraphQL API (align with mnemospark-backend services/dashboard_graphql)."""
 type Health {
   ok: Boolean!
 }
 
 type RevenueSummary {
-  totalCents: Int!
-  currency: String!
+  walletAddress: String!
+  confirmedPaymentCount: Int!
+  totalAmount: String!
 }
 
 type Query {
   health: Health!
-  revenueSummary: RevenueSummary!
+  revenueSummary(walletAddress: String!): RevenueSummary!
 }

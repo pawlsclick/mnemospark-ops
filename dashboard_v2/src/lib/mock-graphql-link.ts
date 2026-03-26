@@ -5,13 +5,19 @@ import type { FetchResult } from "@apollo/client";
 
 function mockResult(operationName: string | undefined): FetchResult {
   switch (operationName) {
-    case "DashboardOverview":
+    case "HealthCheck":
       return {
         data: {
           health: { ok: true, __typename: "Health" },
+        },
+      };
+    case "RevenueOverview":
+      return {
+        data: {
           revenueSummary: {
-            totalCents: 1_250_000,
-            currency: "USD",
+            walletAddress: "0xabc0000000000000000000000000000000000000",
+            confirmedPaymentCount: 3,
+            totalAmount: "1250.500000",
             __typename: "RevenueSummary",
           },
         },

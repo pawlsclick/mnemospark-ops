@@ -14,10 +14,12 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "\n  query DashboardOverview {\n    health {\n      ok\n    }\n    revenueSummary {\n      totalCents\n      currency\n    }\n  }\n": typeof types.DashboardOverviewDocument,
+    "\n  query HealthCheck {\n    health {\n      ok\n    }\n  }\n": typeof types.HealthCheckDocument,
+    "\n  query RevenueOverview($walletAddress: String!) {\n    revenueSummary(walletAddress: $walletAddress) {\n      walletAddress\n      confirmedPaymentCount\n      totalAmount\n    }\n  }\n": typeof types.RevenueOverviewDocument,
 };
 const documents: Documents = {
-    "\n  query DashboardOverview {\n    health {\n      ok\n    }\n    revenueSummary {\n      totalCents\n      currency\n    }\n  }\n": types.DashboardOverviewDocument,
+    "\n  query HealthCheck {\n    health {\n      ok\n    }\n  }\n": types.HealthCheckDocument,
+    "\n  query RevenueOverview($walletAddress: String!) {\n    revenueSummary(walletAddress: $walletAddress) {\n      walletAddress\n      confirmedPaymentCount\n      totalAmount\n    }\n  }\n": types.RevenueOverviewDocument,
 };
 
 /**
@@ -37,7 +39,11 @@ export function graphql(source: string): unknown;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query DashboardOverview {\n    health {\n      ok\n    }\n    revenueSummary {\n      totalCents\n      currency\n    }\n  }\n"): (typeof documents)["\n  query DashboardOverview {\n    health {\n      ok\n    }\n    revenueSummary {\n      totalCents\n      currency\n    }\n  }\n"];
+export function graphql(source: "\n  query HealthCheck {\n    health {\n      ok\n    }\n  }\n"): (typeof documents)["\n  query HealthCheck {\n    health {\n      ok\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query RevenueOverview($walletAddress: String!) {\n    revenueSummary(walletAddress: $walletAddress) {\n      walletAddress\n      confirmedPaymentCount\n      totalAmount\n    }\n  }\n"): (typeof documents)["\n  query RevenueOverview($walletAddress: String!) {\n    revenueSummary(walletAddress: $walletAddress) {\n      walletAddress\n      confirmedPaymentCount\n      totalAmount\n    }\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};
