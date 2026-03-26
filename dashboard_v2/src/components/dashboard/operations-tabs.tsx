@@ -1,10 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
-import { SectionPlaceholder } from "@/components/dashboard/section-placeholder";
-import { TabBar } from "@/components/ui/tab-bar";
+import { TabbedSection } from "@/components/dashboard/tabbed-section";
 
 const TABS = [
   { id: "health", label: "Health" },
@@ -39,33 +35,12 @@ const PANELS: Record<
 };
 
 export function OperationsTabs() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const raw = searchParams.get("tab") ?? "health";
-  const activeId = useMemo(() => {
-    return TABS.some((t) => t.id === raw) ? raw : "health";
-  }, [raw]);
-
-  const setTab = (id: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", id);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  };
-
-  const panel = PANELS[activeId as keyof typeof PANELS];
-
   return (
-    <div className="space-y-6">
-      <TabBar
-        aria-label="Operations sections"
-        tabs={TABS}
-        activeId={activeId}
-        onChange={setTab}
-      />
-      <div role="tabpanel" aria-labelledby={`tab-${activeId}`}>
-        <SectionPlaceholder title={panel.title} description={panel.description} />
-      </div>
-    </div>
+    <TabbedSection
+      tabs={TABS}
+      panels={PANELS}
+      defaultTab="health"
+      ariaLabel="Operations sections"
+    />
   );
 }
