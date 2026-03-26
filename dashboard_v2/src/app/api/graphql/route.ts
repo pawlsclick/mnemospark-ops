@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,14 @@ function isAuthorized(request: NextRequest, username: string, password: string):
   }
 
   const expected = `Basic ${Buffer.from(`${username}:${password}`, "utf8").toString("base64")}`;
-  return authorization === expected;
+  const authorizationBuffer = Buffer.from(authorization, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+
+  if (authorizationBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(authorizationBuffer, expectedBuffer);
 }
 
 export async function POST(request: NextRequest) {
@@ -37,14 +45,22 @@ export async function POST(request: NextRequest) {
   const proxyUsername = process.env.DASHBOARD_GRAPHQL_PROXY_USERNAME?.trim();
   const proxyPassword = process.env.DASHBOARD_GRAPHQL_PROXY_PASSWORD?.trim();
 
-  if (!url || !apiKey || !proxyUsername || !proxyPassword) {
+  if (!url || !apiKey) {
     return graphQlErrorResponse(
-      "GraphQL proxy is not configured (DASHBOARD_GRAPHQL_URL / DASHBOARD_GRAPHQL_API_KEY / DASHBOARD_GRAPHQL_PROXY_USERNAME / DASHBOARD_GRAPHQL_PROXY_PASSWORD).",
+      "GraphQL proxy is not configured (DASHBOARD_GRAPHQL_URL / DASHBOARD_GRAPHQL_API_KEY).",
       503,
     );
   }
 
-  if (!isAuthorized(request, proxyUsername, proxyPassword)) {
+  const proxyAuthEnabled = Boolean(proxyUsername || proxyPassword);
+  if (proxyAuthEnabled && (!proxyUsername || !proxyPassword)) {
+    return graphQlErrorResponse(
+      "GraphQL proxy basic auth is misconfigured (set both DASHBOARD_GRAPHQL_PROXY_USERNAME and DASHBOARD_GRAPHQL_PROXY_PASSWORD).",
+      503,
+    );
+  }
+
+  if (proxyAuthEnabled && !isAuthorized(request, proxyUsername, proxyPassword)) {
     return graphQlErrorResponse(
       "Unauthorized.",
       401,
