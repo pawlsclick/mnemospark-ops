@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 
-const NAV = [{ href: "/", label: "Overview" }];
+import { NavLinks } from "@/components/dashboard/nav-links";
 
 export function AppShell({
   title,
@@ -28,17 +27,7 @@ export function AppShell({
             </p>
           </div>
 
-          <nav className="space-y-2">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block rounded-md border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted/40 hover:text-foreground"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <NavLinks />
         </aside>
 
         <section className="p-4 md:p-6">
