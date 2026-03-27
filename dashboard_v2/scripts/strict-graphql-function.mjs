@@ -2,9 +2,11 @@
  * Post-codegen: replace graphql-codegen client preset's `?? {}` fallback with a throw
  * so Apollo never sends an empty document (which can produce invalid GraphQL text).
  */
-const fs = require("fs");
-const path = require("path");
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const gqlPath = path.join(__dirname, "../src/gql/gql.ts");
 let s = fs.readFileSync(gqlPath, "utf8");
 
