@@ -16,7 +16,6 @@ import { graphql } from "@/gql";
 import { formatAmount, overviewWallet } from "@/lib/dashboard-format";
 import { TIME_RANGE_HELP } from "@/lib/datetime";
 import { dashboardTimeRangeFromIso } from "@/lib/time-ranges";
-import { findWalletFactRow } from "@/lib/wallet-facts";
 
 const RevenueOverviewDocument = graphql(`
   query RevenueOverview(
@@ -30,20 +29,26 @@ const RevenueOverviewDocument = graphql(`
       confirmedPaymentCount
       totalAmount
     }
-    wf24: walletFacts(timeRange: { from: $from24h }, limit: 500) {
-      walletAddress
-      totalRevenue
-      totalPaymentsSettled
+    wd24: walletDetail(walletAddress: $walletAddress, timeRange: { from: $from24h }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
     }
-    wf7: walletFacts(timeRange: { from: $from7d }, limit: 500) {
-      walletAddress
-      totalRevenue
-      totalPaymentsSettled
+    wd7: walletDetail(walletAddress: $walletAddress, timeRange: { from: $from7d }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
     }
-    wf30: walletFacts(timeRange: { from: $from30d }, limit: 500) {
-      walletAddress
-      totalRevenue
-      totalPaymentsSettled
+    wd30: walletDetail(walletAddress: $walletAddress, timeRange: { from: $from30d }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
     }
   }
 `);
@@ -62,15 +67,15 @@ export function OverviewContent() {
     skip: !wallet,
   });
 
-  const periodRows = useMemo(() => {
-    if (!revenueQuery.data || !wallet) return null;
+  const periodWallet = useMemo(() => {
+    if (!revenueQuery.data) return null;
     const d = revenueQuery.data;
     return {
-      h24: findWalletFactRow(d.wf24, wallet),
-      d7: findWalletFactRow(d.wf7, wallet),
-      d30: findWalletFactRow(d.wf30, wallet),
+      h24: d.wd24?.wallet,
+      d7: d.wd7?.wallet,
+      d30: d.wd30?.wallet,
     };
-  }, [revenueQuery.data, wallet]);
+  }, [revenueQuery.data]);
 
   if (!wallet) {
     return (
@@ -127,10 +132,12 @@ export function OverviewContent() {
       <p className="text-xs text-muted-foreground">
         <strong className="font-medium text-foreground">All-time revenue</strong> uses{" "}
         <code className="rounded bg-muted px-1">revenueSummary</code> (full payment ledger for the wallet, no
-        date filter in the API). <strong className="font-medium text-foreground">24h / 7d / 30d</strong> use{" "}
-        <code className="rounded bg-muted px-1">walletFacts(timeRange)</code> — revenue and settled payment
-        counts in that rolling window ({TIME_RANGE_HELP}) If this wallet is outside the top 500 rows for a
-        window, the period may show empty even if there was activity.
+        date filter in the API). The configured address is sent as{" "}
+        <strong className="font-medium text-foreground">EIP-55 checksum</strong> when it is valid hex.{" "}
+        <strong className="font-medium text-foreground">24h / 7d / 30d</strong> use{" "}
+        <code className="rounded bg-muted px-1">walletDetail(timeRange)</code> for that wallet only (
+        {TIME_RANGE_HELP}) If a period still shows empty, the backend likely has no settled payments in that window
+        for this address.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -158,31 +165,34 @@ export function OverviewContent() {
         <Card>
           <CardHeader>
             <CardTitle>Revenue by period</CardTitle>
-            <CardDescription>Same wallet via walletFacts + timeRange (rolling windows).</CardDescription>
+            <CardDescription>
+              Per-wallet aggregates via <code className="text-xs">walletDetail</code> + timeRange (not the global
+              walletFacts leaderboard).
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <dl className="grid gap-3 text-sm">
               <div className="flex justify-between gap-4 border-b border-border/40 pb-2">
                 <dt className="text-muted-foreground">Last 24 hours</dt>
                 <dd className="text-right font-medium tabular-nums">
-                  {periodRows?.h24
-                    ? `${periodRows.h24.totalRevenue.toFixed(4)} · ${periodRows.h24.totalPaymentsSettled} settled`
+                  {periodWallet?.h24
+                    ? `${periodWallet.h24.totalRevenue.toFixed(4)} · ${periodWallet.h24.totalPaymentsSettled} settled`
                     : "—"}
                 </dd>
               </div>
               <div className="flex justify-between gap-4 border-b border-border/40 pb-2">
                 <dt className="text-muted-foreground">Last 7 days</dt>
                 <dd className="text-right font-medium tabular-nums">
-                  {periodRows?.d7
-                    ? `${periodRows.d7.totalRevenue.toFixed(4)} · ${periodRows.d7.totalPaymentsSettled} settled`
+                  {periodWallet?.d7
+                    ? `${periodWallet.d7.totalRevenue.toFixed(4)} · ${periodWallet.d7.totalPaymentsSettled} settled`
                     : "—"}
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Last 30 days</dt>
                 <dd className="text-right font-medium tabular-nums">
-                  {periodRows?.d30
-                    ? `${periodRows.d30.totalRevenue.toFixed(4)} · ${periodRows.d30.totalPaymentsSettled} settled`
+                  {periodWallet?.d30
+                    ? `${periodWallet.d30.totalRevenue.toFixed(4)} · ${periodWallet.d30.totalPaymentsSettled} settled`
                     : "—"}
                 </dd>
               </div>

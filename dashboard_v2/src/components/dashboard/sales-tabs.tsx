@@ -25,7 +25,6 @@ import { graphql } from "@/gql";
 import { formatAmount, overviewWallet } from "@/lib/dashboard-format";
 import { formatDashboardDate, TIME_RANGE_HELP } from "@/lib/datetime";
 import { dashboardTimeRangeFromIso } from "@/lib/time-ranges";
-import { findWalletFactRow } from "@/lib/wallet-facts";
 
 const TABS = [
   { id: "revenue", label: "Revenue" },
@@ -52,20 +51,26 @@ const SalesRevenueQuery = graphql(`
       totalRevenue
       totalQuotes
     }
-    wf24: walletFacts(timeRange: { from: $from24h }, limit: 500) {
-      walletAddress
-      totalRevenue
-      totalPaymentsSettled
+    wd24: walletDetail(walletAddress: $wallet, timeRange: { from: $from24h }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
     }
-    wf7: walletFacts(timeRange: { from: $from7d }, limit: 500) {
-      walletAddress
-      totalRevenue
-      totalPaymentsSettled
+    wd7: walletDetail(walletAddress: $wallet, timeRange: { from: $from7d }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
     }
-    wf30: walletFacts(timeRange: { from: $from30d }, limit: 500) {
-      walletAddress
-      totalRevenue
-      totalPaymentsSettled
+    wd30: walletDetail(walletAddress: $wallet, timeRange: { from: $from30d }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
     }
   }
 `);
@@ -126,15 +131,15 @@ export function SalesTabs() {
     skip: !wallet || activeId !== "revenue",
   });
 
-  const periodRows = useMemo(() => {
-    if (!revenueQ.data || !wallet) return null;
+  const periodWallet = useMemo(() => {
+    if (!revenueQ.data) return null;
     const d = revenueQ.data;
     return {
-      h24: findWalletFactRow(d.wf24, wallet),
-      d7: findWalletFactRow(d.wf7, wallet),
-      d30: findWalletFactRow(d.wf30, wallet),
+      h24: d.wd24.wallet,
+      d7: d.wd7.wallet,
+      d30: d.wd30.wallet,
     };
-  }, [revenueQ.data, wallet]);
+  }, [revenueQ.data]);
 
   const funnelQ = useQuery(SalesFunnelQuery, { skip: activeId !== "funnel" });
 
@@ -169,8 +174,9 @@ export function SalesTabs() {
               <CardHeader>
                 <CardTitle>Configured wallet revenue</CardTitle>
                 <CardDescription>
-                  All-time: <code className="text-xs">revenueSummary</code> (no API date filter). Periods:{" "}
-                  <code className="text-xs">walletFacts(timeRange)</code>. {TIME_RANGE_HELP}
+                  All-time: <code className="text-xs">revenueSummary</code> (no API date filter). Configured address
+                  uses EIP-55 checksum when valid. Periods: <code className="text-xs">walletDetail(timeRange)</code>{" "}
+                  for this wallet only. {TIME_RANGE_HELP}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -187,24 +193,24 @@ export function SalesTabs() {
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">24h</dt>
                     <dd className="text-right font-medium tabular-nums">
-                      {periodRows?.h24
-                        ? `${periodRows.h24.totalRevenue.toFixed(4)} · ${periodRows.h24.totalPaymentsSettled} settled`
+                      {periodWallet?.h24
+                        ? `${periodWallet.h24.totalRevenue.toFixed(4)} · ${periodWallet.h24.totalPaymentsSettled} settled`
                         : "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">7d</dt>
                     <dd className="text-right font-medium tabular-nums">
-                      {periodRows?.d7
-                        ? `${periodRows.d7.totalRevenue.toFixed(4)} · ${periodRows.d7.totalPaymentsSettled} settled`
+                      {periodWallet?.d7
+                        ? `${periodWallet.d7.totalRevenue.toFixed(4)} · ${periodWallet.d7.totalPaymentsSettled} settled`
                         : "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">30d</dt>
                     <dd className="text-right font-medium tabular-nums">
-                      {periodRows?.d30
-                        ? `${periodRows.d30.totalRevenue.toFixed(4)} · ${periodRows.d30.totalPaymentsSettled} settled`
+                      {periodWallet?.d30
+                        ? `${periodWallet.d30.totalRevenue.toFixed(4)} · ${periodWallet.d30.totalPaymentsSettled} settled`
                         : "—"}
                     </dd>
                   </div>
