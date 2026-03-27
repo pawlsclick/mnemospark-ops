@@ -23,9 +23,5 @@ export function formatDashboardDateUtc(iso: string | null | undefined): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}Z`;
 }
 
-export function msAgoIso(ms: number): string {
-  return new Date(Date.now() - ms).toISOString();
-}
-
 export const TIME_RANGE_HELP =
   "Backend window uses each field’s timeRange.from (ISO UTC) through now when to is omitted.";
