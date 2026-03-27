@@ -14,7 +14,7 @@ export default async function WalletDetailPage({
       title="Wallet detail"
       description="Per-wallet KPIs, quote flows, and recent events."
     >
-      <WalletDetailContent address={address} />
+      <WalletDetailContent key={address} address={address} />
     </AppShell>
   );
 }

@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 
+import { HealthSidebarCard } from "@/components/dashboard/health-sidebar-card";
 import { NavLinks } from "@/components/dashboard/nav-links";
 
 export function AppShell({
@@ -28,6 +29,8 @@ export function AppShell({
           </div>
 
           <NavLinks />
+
+          <HealthSidebarCard />
         </aside>
 
         <section className="p-4 md:p-6">
