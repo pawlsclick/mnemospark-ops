@@ -112,7 +112,13 @@ export function graphql(source: "\n  query WalletDetail($walletAddress: String!)
 export function graphql(source: "\n  query WalletFactsPage($limit: Int!) {\n    walletFacts(limit: $limit) {\n      walletAddress\n      totalRevenue\n      totalQuotes\n      medianTransactionSize\n      lastSeenAt\n      firstSeenAt\n    }\n  }\n"): (typeof documents)["\n  query WalletFactsPage($limit: Int!) {\n    walletFacts(limit: $limit) {\n      walletAddress\n      totalRevenue\n      totalQuotes\n      medianTransactionSize\n      lastSeenAt\n      firstSeenAt\n    }\n  }\n"];
 
 export function graphql(source: string) {
-  return (documents as any)[source] ?? {};
+  const doc = (documents as Record<string, unknown>)[source];
+  if (!doc) {
+    throw new Error(
+      "graphql(): document not found. Run npm run codegen in dashboard_v2 after editing GraphQL operations.",
+    );
+  }
+  return doc;
 }
 
 export type DocumentType<TDocumentNode extends DocumentNode<any, any>> = TDocumentNode extends DocumentNode<  infer TType,  any>  ? TType  : never;
