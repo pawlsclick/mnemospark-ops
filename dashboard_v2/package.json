@@ -8,7 +8,7 @@
     "start": "next start -p 3001",
     "lint": "eslint",
     "codegen": "graphql-codegen --config codegen.ts && node scripts/strict-graphql-function.mjs",
-    "codegen:check": "graphql-codegen --config codegen.ts --check"
+    "codegen:check": "npm run codegen && git diff --exit-code -- src/gql/"
   },
   "dependencies": {
     "@apollo/client": "^3.14.0",
