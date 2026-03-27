@@ -15,39 +15,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { graphql } from "@/gql";
 import { formatAmount, overviewWallet } from "@/lib/dashboard-format";
 import { TIME_RANGE_HELP } from "@/lib/datetime";
+import { aggregateSettledQuoteRevenue } from "@/lib/quote-revenue";
 import { dashboardTimeRangeFromIso } from "@/lib/time-ranges";
 
 const RevenueOverviewDocument = graphql(`
-  query RevenueOverview(
-    $walletAddress: String!
-    $from24h: String!
-    $from7d: String!
-    $from30d: String!
-  ) {
+  query RevenueOverview($walletAddress: String!) {
     revenueSummary(walletAddress: $walletAddress) {
       walletAddress
       confirmedPaymentCount
       totalAmount
     }
-    wd24: walletDetail(walletAddress: $walletAddress, timeRange: { from: $from24h }) {
-      wallet {
-        walletAddress
-        totalRevenue
-        totalPaymentsSettled
-      }
-    }
-    wd7: walletDetail(walletAddress: $walletAddress, timeRange: { from: $from7d }) {
-      wallet {
-        walletAddress
-        totalRevenue
-        totalPaymentsSettled
-      }
-    }
-    wd30: walletDetail(walletAddress: $walletAddress, timeRange: { from: $from30d }) {
-      wallet {
-        walletAddress
-        totalRevenue
-        totalPaymentsSettled
+    wdQuotes: walletDetail(walletAddress: $walletAddress) {
+      quotes {
+        hasPaymentSettled
+        amountNormalized
+        lastSeenAt
       }
     }
   }
@@ -58,24 +40,19 @@ export function OverviewContent() {
   const [rangeFrom] = useState(dashboardTimeRangeFromIso);
 
   const revenueQuery = useQuery(RevenueOverviewDocument, {
-    variables: {
-      walletAddress: wallet,
-      from24h: rangeFrom.from24h,
-      from7d: rangeFrom.from7d,
-      from30d: rangeFrom.from30d,
-    },
+    variables: { walletAddress: wallet },
     skip: !wallet,
   });
 
-  const periodWallet = useMemo(() => {
-    if (!revenueQuery.data) return null;
-    const d = revenueQuery.data;
+  const quoteRollups = useMemo(() => {
+    const quotes = revenueQuery.data?.wdQuotes?.quotes ?? [];
     return {
-      h24: d.wd24?.wallet,
-      d7: d.wd7?.wallet,
-      d30: d.wd30?.wallet,
+      all: aggregateSettledQuoteRevenue(quotes),
+      h24: aggregateSettledQuoteRevenue(quotes, { fromIsoUtc: rangeFrom.from24h }),
+      d7: aggregateSettledQuoteRevenue(quotes, { fromIsoUtc: rangeFrom.from7d }),
+      d30: aggregateSettledQuoteRevenue(quotes, { fromIsoUtc: rangeFrom.from30d }),
     };
-  }, [revenueQuery.data]);
+  }, [revenueQuery.data, rangeFrom.from24h, rangeFrom.from7d, rangeFrom.from30d]);
 
   if (!wallet) {
     return (
@@ -130,22 +107,23 @@ export function OverviewContent() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        <strong className="font-medium text-foreground">All-time revenue</strong> uses{" "}
-        <code className="rounded bg-muted px-1">revenueSummary</code> (full payment ledger for the wallet, no
-        date filter in the API). The configured address is sent as{" "}
-        <strong className="font-medium text-foreground">EIP-55 checksum</strong> when it is valid hex.{" "}
-        <strong className="font-medium text-foreground">24h / 7d / 30d</strong> use{" "}
-        <code className="rounded bg-muted px-1">walletDetail(timeRange)</code> for that wallet only (
-        {TIME_RANGE_HELP}) If a period still shows empty, the backend likely has no settled payments in that window
-        for this address.
+        <strong className="font-medium text-foreground">Ledger</strong> uses{" "}
+        <code className="rounded bg-muted px-1">revenueSummary</code> from mnemospark-backend. If it shows 0 but you
+        see paid quotes on Transactions, the backend ledger may be out of sync with quote facts.{" "}
+        <strong className="font-medium text-foreground">Quote-based revenue</strong> sums{" "}
+        <code className="rounded bg-muted px-1">amountNormalized</code> for quotes with{" "}
+        <code className="rounded bg-muted px-1">hasPaymentSettled</code> from{" "}
+        <code className="rounded bg-muted px-1">walletDetail.quotes</code> (same source shape as the wallet detail
+        page). Periods filter by <code className="rounded bg-muted px-1">lastSeenAt</code> ≥ window start (
+        {TIME_RANGE_HELP}) All-time from quotes may be partial if the API caps how many quotes it returns per wallet.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>All-time revenue (ledger)</CardTitle>
+            <CardTitle>Ledger (revenueSummary)</CardTitle>
             <CardDescription>
-              <code className="text-xs">revenueSummary</code> — no time range parameter on this field.
+              Backend payment ledger — no time range parameter on this field.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -164,42 +142,54 @@ export function OverviewContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Revenue by period</CardTitle>
+            <CardTitle>From settled quotes (wallet detail)</CardTitle>
             <CardDescription>
-              Per-wallet aggregates via <code className="text-xs">walletDetail</code> + timeRange (not the global
-              walletFacts leaderboard).
+              Sum of <code className="text-xs">amountNormalized</code> where payment settled — aligns with quote-centric
+              views when the ledger aggregate is wrong.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="grid gap-3 text-sm">
-              <div className="flex justify-between gap-4 border-b border-border/40 pb-2">
-                <dt className="text-muted-foreground">Last 24 hours</dt>
-                <dd className="text-right font-medium tabular-nums">
-                  {periodWallet?.h24
-                    ? `${periodWallet.h24.totalRevenue.toFixed(4)} · ${periodWallet.h24.totalPaymentsSettled} settled`
-                    : "—"}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4 border-b border-border/40 pb-2">
-                <dt className="text-muted-foreground">Last 7 days</dt>
-                <dd className="text-right font-medium tabular-nums">
-                  {periodWallet?.d7
-                    ? `${periodWallet.d7.totalRevenue.toFixed(4)} · ${periodWallet.d7.totalPaymentsSettled} settled`
-                    : "—"}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Last 30 days</dt>
-                <dd className="text-right font-medium tabular-nums">
-                  {periodWallet?.d30
-                    ? `${periodWallet.d30.totalRevenue.toFixed(4)} · ${periodWallet.d30.totalPaymentsSettled} settled`
-                    : "—"}
-                </dd>
-              </div>
-            </dl>
+            <p className="text-2xl font-semibold tabular-nums">
+              {quoteRollups.all.total.toFixed(4)}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {quoteRollups.all.count} settled quote{quoteRollups.all.count === 1 ? "" : "s"} in this response
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Revenue by period (quote facts)</CardTitle>
+          <CardDescription>
+            Settled quotes with <code className="text-xs">lastSeenAt</code> in the rolling window (browser-computed
+            window start → now).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-3 text-sm">
+            <div className="flex justify-between gap-4 border-b border-border/40 pb-2">
+              <dt className="text-muted-foreground">Last 24 hours</dt>
+              <dd className="text-right font-medium tabular-nums">
+                {quoteRollups.h24.total.toFixed(4)} · {quoteRollups.h24.count} settled
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 border-b border-border/40 pb-2">
+              <dt className="text-muted-foreground">Last 7 days</dt>
+              <dd className="text-right font-medium tabular-nums">
+                {quoteRollups.d7.total.toFixed(4)} · {quoteRollups.d7.count} settled
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">Last 30 days</dt>
+              <dd className="text-right font-medium tabular-nums">
+                {quoteRollups.d30.total.toFixed(4)} · {quoteRollups.d30.count} settled
+              </dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
     </div>
   );
 }

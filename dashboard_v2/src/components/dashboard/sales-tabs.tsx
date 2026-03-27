@@ -24,6 +24,7 @@ import { TabBar } from "@/components/ui/tab-bar";
 import { graphql } from "@/gql";
 import { formatAmount, overviewWallet } from "@/lib/dashboard-format";
 import { formatDashboardDate, TIME_RANGE_HELP } from "@/lib/datetime";
+import { aggregateSettledQuoteRevenue } from "@/lib/quote-revenue";
 import { dashboardTimeRangeFromIso } from "@/lib/time-ranges";
 
 const TABS = [
@@ -34,13 +35,7 @@ const TABS = [
 ] as const;
 
 const SalesRevenueQuery = graphql(`
-  query SalesRevenue(
-    $wallet: String!
-    $limit: Int!
-    $from24h: String!
-    $from7d: String!
-    $from30d: String!
-  ) {
+  query SalesRevenue($wallet: String!, $limit: Int!) {
     revenueSummary(walletAddress: $wallet) {
       walletAddress
       confirmedPaymentCount
@@ -51,25 +46,11 @@ const SalesRevenueQuery = graphql(`
       totalRevenue
       totalQuotes
     }
-    wd24: walletDetail(walletAddress: $wallet, timeRange: { from: $from24h }) {
-      wallet {
-        walletAddress
-        totalRevenue
-        totalPaymentsSettled
-      }
-    }
-    wd7: walletDetail(walletAddress: $wallet, timeRange: { from: $from7d }) {
-      wallet {
-        walletAddress
-        totalRevenue
-        totalPaymentsSettled
-      }
-    }
-    wd30: walletDetail(walletAddress: $wallet, timeRange: { from: $from30d }) {
-      wallet {
-        walletAddress
-        totalRevenue
-        totalPaymentsSettled
+    wdQuotes: walletDetail(walletAddress: $wallet) {
+      quotes {
+        hasPaymentSettled
+        amountNormalized
+        lastSeenAt
       }
     }
   }
@@ -121,25 +102,19 @@ export function SalesTabs() {
   const wallet = overviewWallet();
 
   const revenueQ = useQuery(SalesRevenueQuery, {
-    variables: {
-      wallet,
-      limit: 15,
-      from24h: rangeFrom.from24h,
-      from7d: rangeFrom.from7d,
-      from30d: rangeFrom.from30d,
-    },
+    variables: { wallet, limit: 15 },
     skip: !wallet || activeId !== "revenue",
   });
 
-  const periodWallet = useMemo(() => {
-    if (!revenueQ.data) return null;
-    const d = revenueQ.data;
+  const quoteRollups = useMemo(() => {
+    const quotes = revenueQ.data?.wdQuotes?.quotes ?? [];
     return {
-      h24: d.wd24.wallet,
-      d7: d.wd7.wallet,
-      d30: d.wd30.wallet,
+      all: aggregateSettledQuoteRevenue(quotes),
+      h24: aggregateSettledQuoteRevenue(quotes, { fromIsoUtc: rangeFrom.from24h }),
+      d7: aggregateSettledQuoteRevenue(quotes, { fromIsoUtc: rangeFrom.from7d }),
+      d30: aggregateSettledQuoteRevenue(quotes, { fromIsoUtc: rangeFrom.from30d }),
     };
-  }, [revenueQ.data]);
+  }, [revenueQ.data, rangeFrom.from24h, rangeFrom.from7d, rangeFrom.from30d]);
 
   const funnelQ = useQuery(SalesFunnelQuery, { skip: activeId !== "funnel" });
 
@@ -174,9 +149,11 @@ export function SalesTabs() {
               <CardHeader>
                 <CardTitle>Configured wallet revenue</CardTitle>
                 <CardDescription>
-                  All-time: <code className="text-xs">revenueSummary</code> (no API date filter). Configured address
-                  uses EIP-55 checksum when valid. Periods: <code className="text-xs">walletDetail(timeRange)</code>{" "}
-                  for this wallet only. {TIME_RANGE_HELP}
+                  <strong>Ledger</strong>: <code className="text-xs">revenueSummary</code>.{" "}
+                  <strong>Quotes</strong>: sum <code className="text-xs">amountNormalized</code> for{" "}
+                  <code className="text-xs">hasPaymentSettled</code> from <code className="text-xs">walletDetail</code>{" "}
+                  (same idea as Overview when ledger is 0). Periods filter by <code className="text-xs">lastSeenAt</code>{" "}
+                  ≥ window start. {TIME_RANGE_HELP}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -189,29 +166,30 @@ export function SalesTabs() {
                     {revenueQ.data?.revenueSummary.confirmedPaymentCount ?? 0} confirmed payments
                   </p>
                 </div>
+                <div className="border-t border-border/50 pt-3">
+                  <p className="text-xs font-medium text-muted-foreground">All-time (settled quotes in response)</p>
+                  <p className="text-xl font-semibold tabular-nums">{quoteRollups.all.total.toFixed(4)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {quoteRollups.all.count} settled quote{quoteRollups.all.count === 1 ? "" : "s"}
+                  </p>
+                </div>
                 <dl className="space-y-2 border-t border-border/50 pt-3 text-sm">
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">24h</dt>
                     <dd className="text-right font-medium tabular-nums">
-                      {periodWallet?.h24
-                        ? `${periodWallet.h24.totalRevenue.toFixed(4)} · ${periodWallet.h24.totalPaymentsSettled} settled`
-                        : "—"}
+                      {quoteRollups.h24.total.toFixed(4)} · {quoteRollups.h24.count} settled
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">7d</dt>
                     <dd className="text-right font-medium tabular-nums">
-                      {periodWallet?.d7
-                        ? `${periodWallet.d7.totalRevenue.toFixed(4)} · ${periodWallet.d7.totalPaymentsSettled} settled`
-                        : "—"}
+                      {quoteRollups.d7.total.toFixed(4)} · {quoteRollups.d7.count} settled
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">30d</dt>
                     <dd className="text-right font-medium tabular-nums">
-                      {periodWallet?.d30
-                        ? `${periodWallet.d30.totalRevenue.toFixed(4)} · ${periodWallet.d30.totalPaymentsSettled} settled`
-                        : "—"}
+                      {quoteRollups.d30.total.toFixed(4)} · {quoteRollups.d30.count} settled
                     </dd>
                   </div>
                 </dl>
