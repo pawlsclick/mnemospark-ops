@@ -71,9 +71,9 @@ export function OverviewContent() {
     if (!revenueQuery.data) return null;
     const d = revenueQuery.data;
     return {
-      h24: d.wd24.wallet,
-      d7: d.wd7.wallet,
-      d30: d.wd30.wallet,
+      h24: d.wd24?.wallet,
+      d7: d.wd7?.wallet,
+      d30: d.wd30?.wallet,
     };
   }, [revenueQuery.data]);
 
