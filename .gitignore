@@ -6,3 +6,7 @@ AUDIT_FINDINGS.md
 
 # Large reference dump (local only)
 dev_docs/spec/paperclipai-paperclip-8a5edab282632443.txt
+
+# Local mnemospark-lite test artifacts (not tracked)
+.tmp_lite_lambda_event.json
+.tmp_lite_lambda_resp.json
