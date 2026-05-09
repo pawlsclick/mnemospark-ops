@@ -5,7 +5,7 @@ export default function OverviewPage() {
   return (
     <AppShell
       title="Overview"
-      description="Dashboard health and revenue summary from the GraphQL API."
+      description="Revenue by period and all-time ledger totals from the mnemospark GraphQL API."
     >
       <OverviewContent />
     </AppShell>

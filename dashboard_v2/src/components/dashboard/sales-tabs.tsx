@@ -23,6 +23,8 @@ import {
 import { TabBar } from "@/components/ui/tab-bar";
 import { graphql } from "@/gql";
 import { formatAmount, overviewWallet } from "@/lib/dashboard-format";
+import { formatDashboardDate, TIME_RANGE_HELP } from "@/lib/datetime";
+import { dashboardTimeRangeFromIso } from "@/lib/time-ranges";
 
 const TABS = [
   { id: "revenue", label: "Revenue" },
@@ -32,7 +34,13 @@ const TABS = [
 ] as const;
 
 const SalesRevenueQuery = graphql(`
-  query SalesRevenue($wallet: String!, $limit: Int!) {
+  query SalesRevenue(
+    $wallet: String!
+    $limit: Int!
+    $from24h: String!
+    $from7d: String!
+    $from30d: String!
+  ) {
     revenueSummary(walletAddress: $wallet) {
       walletAddress
       confirmedPaymentCount
@@ -42,6 +50,27 @@ const SalesRevenueQuery = graphql(`
       walletAddress
       totalRevenue
       totalQuotes
+    }
+    wd24: walletDetail(walletAddress: $wallet, timeRange: { from: $from24h }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
+    }
+    wd7: walletDetail(walletAddress: $wallet, timeRange: { from: $from7d }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
+    }
+    wd30: walletDetail(walletAddress: $wallet, timeRange: { from: $from30d }) {
+      wallet {
+        walletAddress
+        totalRevenue
+        totalPaymentsSettled
+      }
     }
   }
 `);
@@ -77,6 +106,7 @@ export function SalesTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const rangeFrom = useMemo(() => dashboardTimeRangeFromIso(), []);
   const raw = searchParams.get("tab") ?? "revenue";
   const activeId = useMemo(() => {
     return TABS.some((t) => t.id === raw) ? raw : "revenue";
@@ -91,9 +121,25 @@ export function SalesTabs() {
   const wallet = overviewWallet();
 
   const revenueQ = useQuery(SalesRevenueQuery, {
-    variables: { wallet, limit: 15 },
+    variables: {
+      wallet,
+      limit: 15,
+      from24h: rangeFrom.from24h,
+      from7d: rangeFrom.from7d,
+      from30d: rangeFrom.from30d,
+    },
     skip: !wallet || activeId !== "revenue",
   });
+
+  const periodWallet = useMemo(() => {
+    if (!revenueQ.data) return null;
+    const d = revenueQ.data;
+    return {
+      h24: d.wd24.wallet,
+      d7: d.wd7.wallet,
+      d30: d.wd30.wallet,
+    };
+  }, [revenueQ.data]);
 
   const funnelQ = useQuery(SalesFunnelQuery, { skip: activeId !== "funnel" });
 
@@ -127,15 +173,48 @@ export function SalesTabs() {
             <Card>
               <CardHeader>
                 <CardTitle>Configured wallet revenue</CardTitle>
-                <CardDescription>Same source as Overview.</CardDescription>
+                <CardDescription>
+                  All-time: <code className="text-xs">revenueSummary</code> (no API date filter). Configured address
+                  uses EIP-55 checksum when valid. Periods: <code className="text-xs">walletDetail(timeRange)</code>{" "}
+                  for this wallet only. {TIME_RANGE_HELP}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-semibold">
-                  {formatAmount(revenueQ.data?.revenueSummary.totalAmount ?? "0")}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {revenueQ.data?.revenueSummary.confirmedPaymentCount ?? 0} confirmed payments
-                </p>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">All-time (ledger)</p>
+                  <p className="text-2xl font-semibold">
+                    {formatAmount(revenueQ.data?.revenueSummary.totalAmount ?? "0")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {revenueQ.data?.revenueSummary.confirmedPaymentCount ?? 0} confirmed payments
+                  </p>
+                </div>
+                <dl className="space-y-2 border-t border-border/50 pt-3 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">24h</dt>
+                    <dd className="text-right font-medium tabular-nums">
+                      {periodWallet?.h24
+                        ? `${periodWallet.h24.totalRevenue.toFixed(4)} · ${periodWallet.h24.totalPaymentsSettled} settled`
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">7d</dt>
+                    <dd className="text-right font-medium tabular-nums">
+                      {periodWallet?.d7
+                        ? `${periodWallet.d7.totalRevenue.toFixed(4)} · ${periodWallet.d7.totalPaymentsSettled} settled`
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">30d</dt>
+                    <dd className="text-right font-medium tabular-nums">
+                      {periodWallet?.d30
+                        ? `${periodWallet.d30.totalRevenue.toFixed(4)} · ${periodWallet.d30.totalPaymentsSettled} settled`
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
               </CardContent>
             </Card>
             <Card>
@@ -274,8 +353,10 @@ export function SalesTabs() {
                     {(walletsQ.data?.walletFacts ?? []).map((w) => (
                       <tr key={w.walletAddress} className="border-b border-border/60">
                         <td className="py-2 pr-4 font-mono text-xs">{w.walletAddress}</td>
-                        <td className="py-2 pr-4 text-muted-foreground">{w.firstSeenAt ?? "—"}</td>
-                        <td className="py-2 text-muted-foreground">{w.lastSeenAt ?? "—"}</td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {formatDashboardDate(w.firstSeenAt)}
+                        </td>
+                        <td className="py-2 text-muted-foreground">{formatDashboardDate(w.lastSeenAt)}</td>
                       </tr>
                     ))}
                   </tbody>

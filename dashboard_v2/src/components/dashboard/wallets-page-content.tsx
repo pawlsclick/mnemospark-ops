@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { graphql } from "@/gql";
+import { formatDashboardDate } from "@/lib/datetime";
 
 const WalletFactsQuery = graphql(`
   query WalletFactsPage($limit: Int!) {
@@ -39,7 +40,8 @@ export function WalletsPageContent() {
         <CardHeader>
           <CardTitle>Wallets</CardTitle>
           <CardDescription>
-            Sorted by total revenue (GraphQL). Open a row for detail.
+            Sorted by total revenue (GraphQL). Open a row for detail. Last seen is formatted in your local
+            timezone.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -68,7 +70,7 @@ export function WalletsPageContent() {
                     <td className="py-2 pr-4">{w.totalRevenue.toFixed(4)}</td>
                     <td className="py-2 pr-4">{w.totalQuotes}</td>
                     <td className="py-2 pr-4">{w.medianTransactionSize.toFixed(4)}</td>
-                    <td className="py-2 text-muted-foreground">{w.lastSeenAt ?? "—"}</td>
+                    <td className="py-2 text-muted-foreground">{formatDashboardDate(w.lastSeenAt)}</td>
                   </tr>
                 ))}
               </tbody>

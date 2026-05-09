@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MnemoSpark Ops Console (v2)",
+  title: "mnemospark Ops Console (v2)",
   description: "Internal operations dashboard — GraphQL-backed",
 };
 
