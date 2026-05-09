@@ -1,0 +1,15 @@
+{
+  "folders": [
+    { "path": "../mnemospark" },
+    { "path": "../mnemospark-backend" },
+    { "path": "../mnemospark-app" },
+    { "path": "../mnemospark-website" },
+    { "path": "../mnemospark-docs" },
+    { "path": "../mnemospark-ops" },
+    { "path": "../mnemospark-lite-skills" },
+    { "path": "../mnemospark-skills" },
+    { "path": "../mattermost" }
+  ],
+  "settings": {}
+}
+
