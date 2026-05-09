@@ -10,3 +10,21 @@ dev_docs/spec/paperclipai-paperclip-8a5edab282632443.txt
 # Local mnemospark-lite test artifacts (not tracked)
 .tmp_lite_lambda_event.json
 .tmp_lite_lambda_resp.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+
+# Cursor — ignore local state; commit shared rules under .cursor/rules/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# Editors
+.idea/
+.vscode/
+*.swp
